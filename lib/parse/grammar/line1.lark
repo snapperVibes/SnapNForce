@@ -1,0 +1,21 @@
+start: secure_unit | regular
+
+regular: (attention_clause _SEP)? (building_number _SEP)? street
+building_number . 1: NUMBER
+
+street: (WORD _SEP*)+
+secure_unit: pobox_clause (_SEP attention_clause)?
+    | (attention_clause _SEP+)? pobox_clause
+attention_clause: (attention_signifier _SEP+)? attention_subject
+attention_signifier . 1: "ATTENTION" | "ATTN" | "C/O"
+attention_subject: (WORD _SEP*)+
+pobox_clause: pobox_signifier _SEP+ pobox_number
+pobox_signifier . 1: "PO BOX" | "P O BOX" -> pobox_signifier
+pobox_number: NUMBER
+
+_SEP: COMMA | COLON | SPACE
+COMMA: ","
+COLON: ":"
+SPACE: /\s/
+WORD : /[\w&-]+-*/
+NUMBER: /\d+/

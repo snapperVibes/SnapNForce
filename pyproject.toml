@@ -1,0 +1,23 @@
+[tool.poetry]
+name = "snap"
+version = "0.1.0"
+description = ""
+authors = ["Snapper Vibes <learningwithsnapper@gmail.com>"]
+
+[tool.poetry.dependencies]
+python = "^3.10"
+fastapi = "^0.75.1"
+uvicorn = "^0.17.6"
+lark = "^1.1.2"
+SQLAlchemy = "^1.4.35"
+httpx = "^0.22.0"
+psycopg2 = "^2.9.3"
+beautifulsoup4 = "^4.11.1"
+
+[tool.poetry.dev-dependencies]
+black = "^22.3.0"
+pytest = "^7.1.1"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
