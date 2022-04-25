@@ -1,18 +1,18 @@
-__all__ = ["Line1", "Line2", "Line3"]
-from typing import NamedTuple, Optional
+from pydantic import BaseModel, validator
+from typing import Optional
 
 
-class Line1(NamedTuple):
+class Line1(BaseModel):
     is_pobox: Optional[bool]
     attn: Optional[str]
     number: Optional[str]
     street: Optional[str]
 
 
-class Line2(NamedTuple):
+class Line2(BaseModel):
     city: str
     state: str
 
 
-class Line3(NamedTuple):
+class Line3(BaseModel):
     zip: str

@@ -2,7 +2,7 @@ import pytest
 
 import app
 from lib.parse import line1 as parse
-from lib.parse.types import Line1
+from lib.parse._types import Line1
 from lark.exceptions import UnexpectedEOF
 
 # test format
@@ -14,24 +14,28 @@ from lark.exceptions import UnexpectedEOF
 # Play with the grammer here:
 #  https://www.lark-parser.org/ide/
 
-# breakpoint()
-
 
 def test_001():
     a = parse("ATTENTION: BILLS RECIEVED PO BOX 9201")
-    e = Line1(is_pobox=True, attn="BILLS RECIEVED", number='9201', street=None)
+    e = Line1(is_pobox=True, attn="BILLS RECIEVED", number="9201", street="PO BOX")
     assert a == e
+
 
 def test_002():
     a = parse("569 HELENA ST")
-    e = Line1(is_pobox=False, attn=None, number='569', street="HELENA ST")
+    e = Line1(is_pobox=False, attn=None, number="569", street="HELENA ST")
     assert a == e
+
 
 def test_003():
     a = parse("SELECT PORTFOLIO SERVICING - DISBURSEMENT UNIT 901 CORPORATE CENTER")
-    e = Line1(is_pobox=False, attn="SELECT PORTFOLIO SERVICING - DISBURSEMENT UNIT", number='901', street="CORPORATE CENTER")
+    e = Line1(
+        is_pobox=False,
+        attn="SELECT PORTFOLIO SERVICING - DISBURSEMENT UNIT",
+        number="901",
+        street="CORPORATE CENTER",
+    )
     assert a == e
-
 
 
 # def test_002():
@@ -67,7 +71,6 @@ def test_003():
 # Everything after this is based on real examples
 
 
-
 #
 # def test_010():
 #     a = parse("MORELLE AVE")
@@ -82,7 +85,6 @@ def test_003():
 #     assert  a == e
 
 
-
 # def test_009():
 #     a = parse("PO BOX 1234 ATTN: NAME")
 #     e = Line1(is_pobox=True, attn="NAME", number='1234', street=None)
@@ -94,20 +96,10 @@ def test_003():
 #     assert a == e
 
 
-
-
-
-
-
-
-
-
-
-
-
 def test_f001():
     with pytest.raises(UnexpectedEOF):
         parse("")
+
 
 # def test_f002():
 #     with pytest.raises(Exception):
@@ -116,5 +108,3 @@ def test_f001():
 #
 #
 #
-
-

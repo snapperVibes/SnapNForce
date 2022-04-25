@@ -11,12 +11,22 @@ uvicorn = "^0.17.6"
 lark = "^1.1.2"
 SQLAlchemy = "^1.4.35"
 httpx = "^0.22.0"
-psycopg2 = "^2.9.3"
 beautifulsoup4 = "^4.11.1"
+psycopg2-binary = "^2.9.3"
+sqlmodel = "^0.0.6"
 
 [tool.poetry.dev-dependencies]
 black = "^22.3.0"
 pytest = "^7.1.1"
+sqlacodegen = "^2.3.0"
+flake8 = "^4.0.1"
+mypy = "^0.942"
+
+[tool.mypy]
+exclude = ".venv"
+
+[tool.black]
+line-length = 99
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
