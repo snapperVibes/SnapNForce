@@ -10,9 +10,9 @@ from app.operations._common import GENERAL_LINKED_OBJECT_ROLE, MORTGAGE_LINKED_O
 #  I don't have one right now, so I've just made stuff "private"
 
 
-def parcel(session, parcel_id: str) -> orm.Parcel:
+def parcel(session, county_parcel_id: str) -> orm.Parcel:
     statement = select(orm.Parcel).where(
-        orm.Parcel.parcelidcnty == parcel_id, orm.Parcel.deactivatedts == None
+        orm.Parcel.parcelidcnty == county_parcel_id, orm.Parcel.deactivatedts == None
     )
     return session.execute(statement).scalar_one()
 
@@ -48,8 +48,8 @@ def address(session, address_id: int) -> orm.MailingAddress:
     return session.execute(statement).scalar_one()
 
 
-def _address(session, *, street_id: int, number: str) -> orm.MailingAddress:
-    statement = select(orm.MailingAddress).where(
+def _address(session, *, street_id: int, number: str) -> int:
+    statement = select(orm.MailingAddress.addressid).where(
         orm.MailingAddress.street_streetid == street_id,
         orm.MailingAddress.bldgno == number,
         orm.MailingAddress.deactivatedts == None,
@@ -65,8 +65,8 @@ def street(session, street_id: int) -> orm.MailingStreet:
     return session.execute(statement).scalar_one()
 
 
-def _street(session, *, city_state_zip_id: int, street_name: str, is_pobox: bool) -> int:
-    statement = select(orm.MailingStreet.streetid).where(
+def _street(session, *, city_state_zip_id: int, street_name: str, is_pobox: bool) -> orm.MailingStreet:
+    statement = select(orm.MailingStreet).where(
         orm.MailingStreet.citystatezip_cszipid == city_state_zip_id,
         orm.MailingStreet.name == street_name,
         orm.MailingStreet.pobox == is_pobox,
@@ -83,8 +83,8 @@ def city_state_zip(session, city_state_zip_id: int) -> orm.MailingCityStateZip:
     return session.execute(statement).scalar_one()
 
 
-def _city_state_zip(session, *, city: str, state: str, zip_: str) -> int:
-    statement = select(orm.MailingCityStateZip.id).where(
+def _city_state_zip(session, *, city: str, state: str, zip_: str) -> orm.MailingCityStateZip:
+    statement = select(orm.MailingCityStateZip).where(
         orm.MailingCityStateZip.city == city,
         orm.MailingCityStateZip.state_abbr == state,
         orm.MailingCityStateZip.zip_code == zip_,
@@ -107,3 +107,12 @@ def human(session, human_id: int) -> orm.Human:
         orm.Human.deactivatedts == None,
     )
     return session.execute(statement).scalar_one()
+
+
+def _human(session, *, name: str, is_multi_entity: bool) -> orm.Human:
+    statement = select(orm.Human).where(
+        orm.Human.name == name,
+        orm.Human.multihuman == is_multi_entity,
+        orm.Human.deactivatedts == None
+    )
+    return session.execute(statement).one_or_none()

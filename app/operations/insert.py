@@ -4,6 +4,14 @@ from app import orm
 from app.operations._common import USER_ID
 
 
+_common = {
+    "createdts": func.now(),
+    "createdby_userid": USER_ID,
+    "lastupdatedts": func.now(),
+    "lastupdatedby_userid": USER_ID,
+}
+
+
 def city_state_zip(session, *, city: str, state: str, zip_: str) -> orm.MailingCityStateZip:
     statement = (
         insert(orm.MailingCityStateZip)
@@ -11,10 +19,7 @@ def city_state_zip(session, *, city: str, state: str, zip_: str) -> orm.MailingC
             city=city,
             state_abbr=state,
             zip_code=zip_,
-            createdts=func.now(),
-            createdby_userid=USER_ID,
-            lastupdatedts=func.now(),
-            lastupdatedby_userid=USER_ID,
+            **_common
         )
         .returning(orm.MailingCityStateZip)
     )
@@ -26,30 +31,23 @@ def parcel_mailing(session, *, parcel_key: int, address_id: int, role: int) -> N
         parcel_parcelkey=parcel_key,
         mailingaddress_addressid=address_id,
         linkedobjectrole_lorid=role,
-        createdts=func.now(),
-        createdby_userid=USER_ID,
-        lastupdatedts=func.now(),
-        lastupdatedby_userid=USER_ID,
-        # Todo: auto lastupdatedts
+        **_common
     )
     session.execute(statement)
 
 
-def mailing_street(session, *, street_name, city_state_zip_id, is_pobox) -> orm.MailingStreet:
+def street(session, *, street_name, city_state_zip_id, is_pobox) -> orm.MailingStreet:
     statement = (
         insert(orm.MailingStreet)
         .values(
             name=street_name,
             citystatezip_cszipid=city_state_zip_id,
             pobox=is_pobox,
-            createdts=func.now(),
-            createdby_userid=USER_ID,
-            lastupdatedts=func.now(),
-            lastupdatedby_userid=USER_ID,
+            **_common
         )
         .returning(orm.MailingStreet)
     )
-    return session.execute(statement).scalar_one()
+    return session.execute(statement).one()
 
 
 def mailing_address(session, *, street_id: int, number: str) -> orm.MailingAddress:
@@ -58,11 +56,22 @@ def mailing_address(session, *, street_id: int, number: str) -> orm.MailingAddre
         .values(
             bldgno=number,
             street_streetid=street_id,
-            createdts=func.now(),
-            createdby_userid=USER_ID,
-            lastupdatedts=func.now(),
-            lastupdatedby_userid=USER_ID,
+            **_common
         )
         .returning(orm.MailingAddress)
     )
-    return session.execute(statement).scalar_one()
+    return session.execute(statement).one()
+
+
+def human(session, *, name: str, is_multi_entity: bool) -> orm.Human:
+    statement = insert(orm.Human).values(
+        name=name, multihuman=is_multi_entity, **_common
+    ).returning(orm.Human)
+    return session.execute(statement).one()
+
+
+def human_mailing(session, *, human_id: int, mailing_id: int) -> orm.HumanMailingAddress:
+    statement = insert(orm.HumanMailingAddress).values(
+        human_id=human_id, mailing_id=mailing_id, **_common
+    )
+    return session.execute(statement).one()

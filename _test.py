@@ -17,7 +17,7 @@ def get_parcel_ids(conn: Connection):
     return [i[0] for i in cursor_result]
 
 
-SKIP_TO = 66
+SKIP_TO = 0
 if __name__ == "__main__":
     with _get_db2() as conn:
         parcel_ids = get_parcel_ids(conn)
@@ -30,9 +30,4 @@ if __name__ == "__main__":
             # print(parcel_id, cog_data, sep="\t")
             d = get_parcel_data_from_county(parcel_id)
 
-            print(
-                f"{i}\t{parcel_id}\n"
-                f"GENERAL:\t{d.general}\n"
-                f"MORTGAGE:\t{d.mortgage}\n"
-            )
-
+            print(f"{i}\t{parcel_id}\n" f"GENERAL:\t{d.general}\n" f"MORTGAGE:\t{d.mortgage}\n")

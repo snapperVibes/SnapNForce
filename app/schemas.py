@@ -1,67 +1,41 @@
-from typing import Optional, TypedDict
+from typing import Optional
 
 from sqlmodel import SQLModel
-
 from app import orm
 from lib.types import Line1, Line2, Line3
 
 
-###
-# Generics
-###
-# Generics seem to mess with SQL Model.
-# Since they don't matter at all I am not going to type these classes
-# O = TypeVar("O", bound="_BaseOwner")
-# M = TypeVar("M", bound="_BaseMailing")
-# OM = TypeVar("OM")
-#
-#
-# class _BaseOwner(SQLModel):
-#     name: str
-#
-#
-# class _BaseMailing(SQLModel):
-#     line1: Optional[Line1]
-#     line2: Optional[Line2]
-#     line3: Optional[Line3]
-#
-#
-# class _BaseOwnerAndMailing(SQLModel):
-#     owner: Optional[O]
-#     mailing: M
-#
-#
-# class _BaseGeneralAndMortgage(SQLModel):
-#     general: OM
-#     mortgage: OM
+class Owner(SQLModel):
+    name: str
+    is_multi_entity: Optional[bool]
 
 
-###
-# Shared
-###
+class Mailing(SQLModel):
+    line1: Optional[Line1]
+    line2: Optional[Line2]
+    line3: Optional[Line3]
 
 
+class OwnerAndMailing(SQLModel):
+    owner: Owner
+    mailing: Mailing
 
 
+class GeneralAndMortgage(SQLModel):
+    general: OwnerAndMailing
+    mortgage: OwnerAndMailing
 
-# class CogOwner(SQLModel):
-#     human: orm.Human
-#
-#
-# class CogMailing(SQLModel):
-#     parcel: orm.Parcel
-#     parcel_mailing_address: orm.ParcelMailingAddress
-#     mailing_address: orm.MailingAddress
-#     mailing_street: orm.MailingStreet
-#     city_state_zip: orm.MailingCityStateZip
-#
-#
-# class CogOwnerAndMailing(SQLModel):
-#     owner: CogOwner
-#     mailing: CogMailing
-#     owner_mailing: orm.HumanMailingAddress
-#
-#
-# class CogGeneralAndMortgage(SQLModel):
-#     general: CogOwnerAndMailing
-#     mortgage: CogOwnerAndMailing
+
+class CogTables(SQLModel):
+    parcel: Optional[orm.Parcel]
+    address: Optional[orm.MailingAddress]
+    parcel_address: Optional[orm.ParcelMailingAddress]
+    street: Optional[orm.MailingStreet]
+    city_state_zip: Optional[orm.MailingCityStateZip]
+    human: Optional[orm.Human]
+    human_address: Optional[orm.HumanMailingAddress]
+
+
+class CogGeneralAndMortgage(SQLModel):
+    general: CogTables
+    mortgage: CogTables

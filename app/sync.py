@@ -1,3 +1,34 @@
+from app import schemas
+from sqlmodel import Session
+
+from app.operations import select_or_insert
+
+
+def sync_county_data_with_cog(
+    db: Session, *, parcel_id: str, county_mailing: schemas.Mailing
+) -> schemas.GeneralAndMortgage:
+    a, city_state_zip = select_or_insert.city_state_zip(
+        db,
+        city=county_mailing.line2.city,
+        state=county_mailing.line2.state,
+        zip_=county_mailing.line3.zip,
+    )
+    b, street = select_or_insert.street(
+        db,
+        city_state_zip_id=city_state_zip.id,
+        street_name=county_mailing.line1.street,
+        is_pobox=county_mailing.line1.is_pobox,
+    )
+    c, address = select_or_insert.address(
+        db, street_id=street.streetid, number=county_mailing.line1.number
+    )
+    ## Todo: we're net set up to handle the insertion of new parcels yet
+    # parcel = select_or_insert.parcel(
+    #     db, county_parcel_id=parcel_id,
+    # )
+    return address, street, city_state_zip
+
+
 # from typing import Optional
 #
 # from sqlmodel import Session
