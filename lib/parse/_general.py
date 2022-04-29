@@ -13,7 +13,7 @@ class GeneralTransformer(Transformer):
         self._street = None
         self._type = None
         self._is_pobox = None
-        self._room = None
+        self._secondary = None
 
     def building_number(self, v):
         self._number = " ".join(w for w in v)
@@ -39,6 +39,13 @@ class GeneralTransformer(Transformer):
         self._number = " ".join(w for w in v)
         return v
 
+    def secondary(self, v):
+        self._secondary = " ".join(
+            str(tree.children[0]) for tree in
+            (tree for tree in v)
+        )
+        return v
+
     def start(self, v):
         if not self._is_pobox:
             self._is_pobox = False
@@ -52,7 +59,8 @@ class GeneralTransformer(Transformer):
             is_pobox=self._is_pobox,
             street=" ".join(street),
             number=self._number,
-            attn=self._attn
+            attn=self._attn,
+            secondary=self._secondary
         )
 
 # TODO: NAMING
@@ -68,4 +76,5 @@ def general_street_line(text: str) -> Line1:
 def city_state_zip(text: str) -> tuple[Line2, Line3]:
     # Todo: naming. This is for the "general" case, compared to the "mortgage" case
     city, _comma, state, zip_ = text.split("\xa0")
+
     return Line2(city=city, state=state), Line3(zip=_extract_zip_code(zip_))

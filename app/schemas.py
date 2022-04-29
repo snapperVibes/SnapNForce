@@ -11,14 +11,14 @@ class Owner(SQLModel):
 
 
 class Mailing(SQLModel):
-    line1: Optional[Line1]
-    line2: Optional[Line2]
-    line3: Optional[Line3]
+    line1: Line1
+    line2: Line2
+    line3: Line3
 
 
 class OwnerAndMailing(SQLModel):
-    owner: Owner
-    mailing: Mailing
+    owner: Optional[Owner] = None
+    mailing: Optional[Mailing] = None
 
 
 class GeneralAndMortgage(SQLModel):
@@ -37,5 +37,5 @@ class CogTables(SQLModel):
 
 
 class CogGeneralAndMortgage(SQLModel):
-    general: CogTables
-    mortgage: CogTables
+    general: Optional[CogTables]
+    mortgage: Optional[CogTables]

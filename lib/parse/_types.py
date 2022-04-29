@@ -7,6 +7,7 @@ class Line1(BaseModel):
     attn: Optional[str]
     number: Optional[str]
     street: Optional[str]
+    secondary: Optional[str] = None
 
 
 class Line2(BaseModel):

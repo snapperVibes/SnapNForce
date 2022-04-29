@@ -12,6 +12,7 @@ class LineOneTransformer(Transformer):
         self._number = None
         self._street = None
         self._is_pobox = None
+        self._secondary = None
 
     def street(self, v):
         self._street = " ".join(w for w in v)  # word for word in value
@@ -33,6 +34,15 @@ class LineOneTransformer(Transformer):
         self._number = " ".join(w for w in v)
         return v
 
+    def secondary(self, v):
+        # THIS ONE IS DIFFERENT: IT RETURNS A LIST OF TREES.
+        #  Each tree has a subtree for each role (
+        self._secondary = " ".join(
+            str(tree.children[0]) for tree in
+            (tree for tree in v)
+        )
+        return v
+
     def start(self, v):
         # This is the one that gives the output
         if not self._is_pobox:
@@ -45,6 +55,7 @@ class LineOneTransformer(Transformer):
             attn=self._attn,
             number=self._number,
             street=self._street,
+            secondary=self._secondary
         )
 
 # Todo: Research standalone parser

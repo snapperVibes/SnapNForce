@@ -14,7 +14,7 @@ _host = "127.0.0.1"
 _port = "5432"
 _db_name = "cogdb"
 _engine_params = f"postgresql+psycopg2://{_db_user}:{_db_password}@{_host}:{_port}/{_db_name}"
-_engine: Engine = create_engine(_engine_params, echo=True)
+_engine: Engine = create_engine(_engine_params, echo=False)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=_engine)
 metadata = MetaData()
 Base = declarative_base()

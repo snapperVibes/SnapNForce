@@ -38,6 +38,18 @@ def test_003():
     assert a == e
 
 
+def test_004():
+    a = parse("MORELLE AVE")
+    e = Line1(is_pobox=False, attn=None, number=None, street="MORELLE AVE")
+    assert a == e
+
+
+def test_005():
+    a = parse("111 WESTPORT PLZ STE 1150")
+    e = Line1(is_pobox=False, attn=None, number="111", street="WESTPORT PLZ", secondary="STE 1150")
+    assert a == e
+
+
 # def test_002():
 #     a = parse("PO BOX: EXAMPLE 123")
 #     e = Line1(is_pobox=True, attn=None, number='EXAMPLE 123', street=None)

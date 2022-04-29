@@ -1,13 +1,14 @@
-import warnings
+import logging
+from os import path
 
-import app
-import lib.parse
-from app.lib import get_parcel_data_from_county, mailing_from_raw_general
-from app.database import _get_db2, SessionLocal
 from sqlalchemy import text
 from sqlalchemy.engine import Connection
 
-from lib import scrape, parse
+from app.database import _get_db2, SessionLocal
+from app.lib import sync_parcel_data
+
+logging.basicConfig(filename=path.join("log", "_test.log"), filemode="a", level=logging.INFO)
+logging.getLogger("root")
 
 
 def get_parcel_ids(conn: Connection):
@@ -17,17 +18,22 @@ def get_parcel_ids(conn: Connection):
     return [i[0] for i in cursor_result]
 
 
-SKIP_TO = 0
+# SKIP_TO = 5
+SKIP_TO = 196
+
+logging.info("Having another go at it 🙂")
 if __name__ == "__main__":
     with _get_db2() as conn:
         parcel_ids = get_parcel_ids(conn)
-    with SessionLocal() as session:
+    with SessionLocal() as db:
         for i, parcel_id in enumerate(parcel_ids):
             if i < SKIP_TO:
                 continue
             # TODO: fix caching
             # cog_data = get_cog_tables(parcel_id)
             # print(parcel_id, cog_data, sep="\t")
-            d = get_parcel_data_from_county(parcel_id)
-
+            logging.info(f"Parcel:\t{parcel_id}\tNumber:\t{i}")
+            d = sync_parcel_data(db, parcel_id)
+            print("\n")
             print(f"{i}\t{parcel_id}\n" f"GENERAL:\t{d.general}\n" f"MORTGAGE:\t{d.mortgage}\n")
+            print("\n" + "-" * 89)

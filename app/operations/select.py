@@ -48,8 +48,8 @@ def address(session, address_id: int) -> orm.MailingAddress:
     return session.execute(statement).scalar_one()
 
 
-def _address(session, *, street_id: int, number: str) -> int:
-    statement = select(orm.MailingAddress.addressid).where(
+def _address(session, *, street_id: int, number: str, attn: Optional[str]) -> orm.MailingAddress:
+    statement = select(orm.MailingAddress).where(
         orm.MailingAddress.street_streetid == street_id,
         orm.MailingAddress.bldgno == number,
         orm.MailingAddress.deactivatedts == None,
@@ -65,7 +65,9 @@ def street(session, street_id: int) -> orm.MailingStreet:
     return session.execute(statement).scalar_one()
 
 
-def _street(session, *, city_state_zip_id: int, street_name: str, is_pobox: bool) -> orm.MailingStreet:
+def _street(
+    session, *, city_state_zip_id: int, street_name: str, is_pobox: bool
+) -> orm.MailingStreet:
     statement = select(orm.MailingStreet).where(
         orm.MailingStreet.citystatezip_cszipid == city_state_zip_id,
         orm.MailingStreet.name == street_name,
@@ -113,6 +115,6 @@ def _human(session, *, name: str, is_multi_entity: bool) -> orm.Human:
     statement = select(orm.Human).where(
         orm.Human.name == name,
         orm.Human.multihuman == is_multi_entity,
-        orm.Human.deactivatedts == None
+        orm.Human.deactivatedts == None,
     )
-    return session.execute(statement).one_or_none()
+    return session.execute(statement).scalar_one_or_none()

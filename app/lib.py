@@ -3,6 +3,8 @@
 # fmt: off
 import re
 from functools import partial
+from typing import Optional
+from unittest.mock import Mock
 
 from sqlmodel import Session
 from bs4 import NavigableString, Tag
@@ -35,53 +37,88 @@ def sync_parcel_data(db: Session, parcel_id: str) -> schemas.GeneralAndMortgage:
     )
 
 
-def _sync_owner_and_mailing(db, county: schemas.OwnerAndMailing, cog: schemas.CogTables) -> schemas.OwnerAndMailing:
+def _sync_owner_and_mailing(db, county: schemas.OwnerAndMailing, cog: Optional[schemas.CogTables]) -> schemas.OwnerAndMailing:
     # SYNC MAILING
+
+
+    # SEE IF THE ADDRESS IS THE SAME
+    #  WHILE YOU CHECK, IF THE COG DOES NOT EXIST, WRITE IT
+    #  IF THEY ARE THE SAME, YOU DO NOT NEED TO DISABLE THE OLD ADDRESS
+    #
+    #  IF THEY ARE THE SAME, CONTINUE
     m = county.mailing
-    city_state_zip = ensure.city_state_zip(db, city=m.line2.city, state=m.line2.state, zip_=m.line3.zip)
-    street = ensure.street(db, city_state_zip_id=city_state_zip.id, street_name=m.line1.street, is_pobox=m.line1.is_pobox)
-    address = ensure.address(db, street_id=street.streetid, number=m.line1.number)
-    #
-    # # Todo: The insert doesn't work yet because we need the muni. I'll figure it out later
-    # # Todo: Somehow signify that this one does not update the timestamp. Or should it?
-    # parcel = ensure.parcel(db, county_parcel_id=parcel_id)
-    #
-    # Compare the details in the CoG to the details in the County
-    # Notice that schemas.Mailing does not have nullable fields
-    cog_line_1 = schemas.Line1(is_pobox=cog.street.pobox, attn=cog.address.attention, number=cog.address.bldgno, street=cog.street.name)
-    cog_line_2 = schemas.Line2(city=cog.city_state_zip.city, state=cog.city_state_zip.state_abbr)
-    cog_line_3 = schemas.Line3(zip=cog.city_state_zip.zip_code)
-    #
-    address_is_same = all(
-        (x == y)
-        for x, y in zip([m.line1, m.line2, m.line3], [cog_line_1, cog_line_2, cog_line_3])
-    )
-    if not address_is_same:
-        deactivate.parcel_mailing_address(db, parcel_key=cog.parcel.parcelkey, address_id=address.addressid)
-        parcel_mailing = insert.parcel_mailing(
-            db, parcel_key=cog.parcel.parcelkey, address_id=address.addressid, role=GENERAL_LINKED_OBJECT_ROLE
+    city_state_zip = None
+    street=None
+    address = None
+    if m is not None:
+        city_state_zip = ensure.city_state_zip(db, city=m.line2.city, state=m.line2.state, zip_=m.line3.zip)
+        street = ensure.street(db, city_state_zip_id=city_state_zip.id, street_name=m.line1.street, is_pobox=m.line1.is_pobox)
+        address = ensure.address(db, street_id=street.streetid, number=m.line1.number, attn=m.line1.attn)
+
+    # Todo: The insert doesn't work yet because we need the muni. I'll figure it out later
+
+
+    address_is_same = None
+    if cog is not None:
+        cog_line_1 = schemas.Line1(is_pobox=cog.street.pobox, attn=cog.address.attention, number=cog.address.bldgno, street=cog.street.name)
+        cog_line_2 = schemas.Line2(city=cog.city_state_zip.city, state=cog.city_state_zip.state_abbr)
+        cog_line_3 = schemas.Line3(zip=cog.city_state_zip.zip_code)
+        #
+        address_is_same = all(
+            (x == y)
+            for x, y in zip([m.line1, m.line2, m.line3], [cog_line_1, cog_line_2, cog_line_3])
         )
+    else:
+        address_is_same = True
+
+
+    if not address_is_same:
+        if address is not None:
+            deactivate.parcel_mailing_address(db, parcel_key=cog.parcel.parcelkey, address_id=address.addressid)
+            insert.parcel_mailing(
+                db, parcel_key=cog.parcel.parcelkey, address_id=address.addressid, role=GENERAL_LINKED_OBJECT_ROLE
+            )
+
+
+
+
+
+
+
+
 
     # SYNC OWNER
     ############################
     o = county.owner
     # human-ify the cog owner
-    if not all(
+    if (not (cog is None)) and (not (cog.human is None)) and (not all(
             (x == y)
             for x, y in zip([o.name, o.is_multi_entity], [cog.human.name, cog.human.multihuman])
-    ):
+    )):
         deactivate.human_mailing_address(
             db, human_id=cog.human_address.humanmailing_humanid, mailing_id=cog.human_address.humanmailing_addressid
         )
-        human = select._human(db, name=o.name, is_multi_entity=o.is_multi_entity)
-        if not human:
-            human = insert.human(db, name=o.name, is_multi_entity=o.is_multi_entity)
-        insert.human_mailing(db, human_id=human.humanid, mailing_id=address.addressid)
+    # TODO: THIS WILL FAIL IN DISASTROUS WAYS IF TWO PEOPLE HAVE THE SAME NAME.
+    #  TALK TO ERIC AND FIGURE IT OUT
+    human = select._human(db, name=o.name, is_multi_entity=o.is_multi_entity)
+    if not human:
+        human = insert.human(db, name=o.name, is_multi_entity=o.is_multi_entity)
+        if address is not None:
+            insert.human_mailing(db, human_id=human.humanid, mailing_id=address.addressid)
 
-    mailing = schemas.Mailing(
-        line1=schemas.Line1(is_pobox=street.pobox, attn=address.attention, number=address.bldgno, street=street.name)
-    )
-    owner = schemas.Owner(name=human.name, is_multi_entity=human.multihuman)
+    mailing = None
+    if city_state_zip is not None:
+        mailing = schemas.Mailing(
+            line1=schemas.Line1(is_pobox=street.pobox, attn=address.attention, number=address.bldgno, street=street.name),
+            line2=schemas.Line2(city=city_state_zip.city, state=city_state_zip.state_abbr),
+            line3=schemas.Line3(zip=city_state_zip.zip_code)
+        )
+
+    owner = None
+    try:
+        owner = schemas.Owner(name=human.name, is_multi_entity=human.multihuman)
+    except AttributeError:
+        breakpoint()
     return schemas.OwnerAndMailing(owner=owner, mailing=mailing)
 
 
@@ -128,7 +165,7 @@ def owner_from_raw(data: list[Tag | NavigableString]) -> schemas.Owner:
     return schemas.Owner(name=clean_owner, is_multi_entity=is_multi_entity)
 
 
-def mailing_from_raw_tax(data: list[Tag | NavigableString]) -> schemas.Mailing:
+def mailing_from_raw_tax(data: list[Tag | NavigableString]) -> Optional[schemas.Mailing]:
     # Todo: these two functions almost certainly belong in lib.parse
     address_list = _clean_tags(data)
     if len(address_list) == 3:
@@ -136,13 +173,13 @@ def mailing_from_raw_tax(data: list[Tag | NavigableString]) -> schemas.Mailing:
         line2 = parse.line2(address_list[1])
         line3 = parse.line3(address_list[2])
     elif not address_list:
-        line1 = line2 = line3 = None
+        return None
     else:
         raise NotImplementedError("I haven't dealt with this yet")
     return schemas.Mailing(line1=line1, line2=line2, line3=line3)
 
 
-def mailing_from_raw_general(data: list[Tag | NavigableString]) -> schemas.Mailing:
+def mailing_from_raw_general(data: list[Tag | NavigableString]) -> Optional[schemas.Mailing]:
     address_list = _clean_tags(data)
     if len(address_list) == 2:
         line1 = parse.general_street_line(address_list[0])
@@ -157,9 +194,9 @@ def mailing_from_raw_general(data: list[Tag | NavigableString]) -> schemas.Maili
         )
         line1 = parse.general_street_line(address_list[1])
         line1.attn = attn
-        line2, line3 = parse.city_state_zip(address_list[1])
+        line2, line3 = parse.city_state_zip(address_list[2])
     elif len(address_list) == 0:
-        line1 = line2 = line3 = None
+        return None
     else:
         raise RuntimeError
     return schemas.Mailing(line1=line1, line2=line2, line3=line3)
