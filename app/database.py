@@ -1,11 +1,27 @@
+from collections import namedtuple
 from contextlib import contextmanager
-from typing import Generator
 
-from sqlalchemy import text, MetaData
+from sqlalchemy import MetaData
+from sqlalchemy.engine import Engine
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
 from sqlalchemy.future import create_engine
-from sqlalchemy.engine import Engine, Connection
+from sqlalchemy.orm import sessionmaker
+
+_Settings = namedtuple("_Settings", ["hostname", "port", "database", "username", "password"])
+
+# https://www.postgresql.org/docs/current/libpq-pgpass.html
+# def _parse_passwordfile(filename: str) -> list[_Settings]:
+#     with open(filename, "r") as f:
+#         original_lines = f.readlines()
+#     pattern = re.compile(r"(.*?)(#.*)?")
+#     lines = filter(lambda x: x == "", [re.split(pattern, line)[1].strip() for line in original_lines])
+#     pattern = re.compile(r"[^\\]:")
+#     return [_Settings(*re.split(pattern, line)[1:]) for line in lines]
+#
+# settings = _parse_passwordfile(PASSWORD_FILE)
+# if len(settings) > 1:
+#     raise RuntimeError("Multiple users are listed in the password file.")
+# settings = settings[0]
 
 
 _db_user = "sylvia"
@@ -29,6 +45,7 @@ def get_db():
 
 
 @contextmanager
-def _get_db2():
+def get_db_context():
+    # For use outside of FastAPI
     with _engine.connect() as conn:
         yield conn

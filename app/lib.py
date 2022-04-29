@@ -1,21 +1,19 @@
 # """ Common functions made from the primitives found in lib"""
-# Todo: this has become a monolithic mess. Fix
 # fmt: off
 import re
 from functools import partial
 from typing import Optional
-from unittest.mock import Mock
 
-from sqlmodel import Session
 from bs4 import NavigableString, Tag
+from sqlalchemy.exc import NoResultFound
+from sqlmodel import Session
+
 from app import schemas
+from app.operations import insert, deactivate, ensure
+from app.operations import select
 from app.operations._common import GENERAL_LINKED_OBJECT_ROLE, MORTGAGE_LINKED_OBJECT_ROLE
-from app.operations import select, insert, update, deactivate, ensure
 from app.schemas import CogGeneralAndMortgage
 from lib import scrape, parse
-from app.operations import select
-from sqlalchemy.exc import NoResultFound
-from app.sync import sync_county_data_with_cog
 
 
 def sync_parcel_data(db: Session, parcel_id: str) -> schemas.GeneralAndMortgage:
@@ -38,8 +36,8 @@ def sync_parcel_data(db: Session, parcel_id: str) -> schemas.GeneralAndMortgage:
 
 
 def _sync_owner_and_mailing(db, county: schemas.OwnerAndMailing, cog: Optional[schemas.CogTables]) -> schemas.OwnerAndMailing:
+    # Todo: This is one of the messiest functions in the code. Refactor
     # SYNC MAILING
-
 
     # SEE IF THE ADDRESS IS THE SAME
     #  WHILE YOU CHECK, IF THE COG DOES NOT EXIST, WRITE IT
@@ -51,26 +49,22 @@ def _sync_owner_and_mailing(db, county: schemas.OwnerAndMailing, cog: Optional[s
     street=None
     address = None
     if m is not None:
-        city_state_zip = ensure.city_state_zip(db, city=m.line2.city, state=m.line2.state, zip_=m.line3.zip)
-        street = ensure.street(db, city_state_zip_id=city_state_zip.id, street_name=m.line1.street, is_pobox=m.line1.is_pobox)
-        address = ensure.address(db, street_id=street.streetid, number=m.line1.number, attn=m.line1.attn)
+        city_state_zip = ensure.city_state_zip(db, city=m.last.city, state=m.last.state, zip_=m.last.zip)
+        street = ensure.street(db, city_state_zip_id=city_state_zip.id, street_name=m.delivery.street, is_pobox=m.delivery.is_pobox)
+        address = ensure.address(db, street_id=street.streetid, number=m.delivery.number, attn=m.delivery.attn, secondary=m.delivery.secondary)
 
     # Todo: The insert doesn't work yet because we need the muni. I'll figure it out later
 
-
-    address_is_same = None
+    address_is_same: bool
     if cog is not None:
-        cog_line_1 = schemas.Line1(is_pobox=cog.street.pobox, attn=cog.address.attention, number=cog.address.bldgno, street=cog.street.name)
-        cog_line_2 = schemas.Line2(city=cog.city_state_zip.city, state=cog.city_state_zip.state_abbr)
-        cog_line_3 = schemas.Line3(zip=cog.city_state_zip.zip_code)
-        #
+        cog_line_1 = schemas.DeliveryAddressLine(is_pobox=cog.street.pobox, attn=cog.address.attention, number=cog.address.bldgno, street=cog.street.name)
+        cog_line_2 = schemas.LastLine(city=cog.city_state_zip.city, state=cog.city_state_zip.state_abbr, zip=cog.city_state_zip.zip_code)
         address_is_same = all(
             (x == y)
-            for x, y in zip([m.line1, m.line2, m.line3], [cog_line_1, cog_line_2, cog_line_3])
+            for x, y in zip([m.delivery, m.last], [cog_line_1, cog_line_2])
         )
     else:
         address_is_same = True
-
 
     if not address_is_same:
         if address is not None:
@@ -79,18 +73,11 @@ def _sync_owner_and_mailing(db, county: schemas.OwnerAndMailing, cog: Optional[s
                 db, parcel_key=cog.parcel.parcelkey, address_id=address.addressid, role=GENERAL_LINKED_OBJECT_ROLE
             )
 
-
-
-
-
-
-
-
-
     # SYNC OWNER
     ############################
     o = county.owner
     # human-ify the cog owner
+    # Todo: make this more readable
     if (not (cog is None)) and (not (cog.human is None)) and (not all(
             (x == y)
             for x, y in zip([o.name, o.is_multi_entity], [cog.human.name, cog.human.multihuman])
@@ -109,9 +96,8 @@ def _sync_owner_and_mailing(db, county: schemas.OwnerAndMailing, cog: Optional[s
     mailing = None
     if city_state_zip is not None:
         mailing = schemas.Mailing(
-            line1=schemas.Line1(is_pobox=street.pobox, attn=address.attention, number=address.bldgno, street=street.name),
-            line2=schemas.Line2(city=city_state_zip.city, state=city_state_zip.state_abbr),
-            line3=schemas.Line3(zip=city_state_zip.zip_code)
+            delivery=schemas.DeliveryAddressLine(is_pobox=street.pobox, attn=address.attention, number=address.bldgno, street=street.name),
+            last=schemas.LastLine(city=city_state_zip.city, state=city_state_zip.state_abbr, zip=city_state_zip.zip_code)
         )
 
     owner = None
@@ -146,8 +132,6 @@ def get_tax_data_from_county(parcel_id: str):
     return schemas.OwnerAndMailing(owner=owner, mailing=mailing)
 
 
-#
-#
 def owner_from_raw(data: list[Tag | NavigableString]) -> schemas.Owner:
     owner_list = _clean_tags(data)
     is_multi_entity = False
@@ -169,37 +153,30 @@ def mailing_from_raw_tax(data: list[Tag | NavigableString]) -> Optional[schemas.
     # Todo: these two functions almost certainly belong in lib.parse
     address_list = _clean_tags(data)
     if len(address_list) == 3:
-        line1 = parse.line1(address_list[0])
-        line2 = parse.line2(address_list[1])
-        line3 = parse.line3(address_list[2])
+        delivery_line = parse.mortgage_delivery_address_line(address_list[0])
+        last_line = parse.mortgage_last_line(city_state=address_list[1], zip=address_list[2])
     elif not address_list:
         return None
     else:
         raise NotImplementedError("I haven't dealt with this yet")
-    return schemas.Mailing(line1=line1, line2=line2, line3=line3)
+    return schemas.Mailing(delivery=delivery_line, last=last_line)
 
 
 def mailing_from_raw_general(data: list[Tag | NavigableString]) -> Optional[schemas.Mailing]:
     address_list = _clean_tags(data)
     if len(address_list) == 2:
-        line1 = parse.general_street_line(address_list[0])
-        line2, line3 = parse.city_state_zip(address_list[1])
+        delivery_line = parse.general_delivery_address_line(address_list[0])
+        last_line = parse.city_state_zip(address_list[1])
     elif len(address_list) == 3:
-        attn = (
-            address_list[0]
-            .lstrip("ATTN ")
-            .lstrip("ATTN: ")
-            .lstrip("ATTENTION ")
-            .lstrip("ATTENTION: ")
-        )
-        line1 = parse.general_street_line(address_list[1])
-        line1.attn = attn
-        line2, line3 = parse.city_state_zip(address_list[2])
+        delivery_line = parse.general_delivery_address_line(address_list[1])
+        # "ATTN ", "ATTN: ", "ATTENTION ", "ATTENTION: "
+        delivery_line.attn = re.sub(r"ATT(N|ENTION):?\s+", address_list[0], "")
+        last_line = parse.city_state_zip(address_list[2])
     elif len(address_list) == 0:
         return None
     else:
         raise RuntimeError
-    return schemas.Mailing(line1=line1, line2=line2, line3=line3)
+    return schemas.Mailing(delivery=delivery_line, last=last_line)
 
 
 def _clean_tags(content: list[Tag | NavigableString]) -> list[str]:
@@ -248,90 +225,3 @@ def _match_number(num_to_match: int, owners_and_mailings: list[schemas.CogTables
 
 _match_general = partial(_match_number, GENERAL_LINKED_OBJECT_ROLE)
 _match_mortgage = partial(_match_number, MORTGAGE_LINKED_OBJECT_ROLE)
-
-#
-# # def _sync(
-# #     db: Session,
-# #     parcel_id: str,
-# #     role: int,
-# #     county_info: schemas.OwnerAndMailing,
-# #     cog_tables: Optional[schemas.CogTables],
-# # ):
-# #     # Todo: Find a schema where "parcel_id" doesn't have to be an argument"
-# #     cog_info = _cog_tables_to_owner_and_mailing(cog_tables)
-# #
-# #     if county_info.mailing != cog_info.mailing:
-# #         if county_info is None:
-# #             raise NotImplementedError("Todo: get to cases where the cog has more info than the county")
-# #         # Todo: writing this code pains me because of how unorganized it is. REFACTOR
-# #         #  Additionally, I have a nagging suspicion this code is broken
-# #         parcel_key: int
-# #         if not (cog_tables is None):
-# #             deactivate.parcel_mailing_address(
-# #                 db,
-# #                 parcel_key=cog_tables.parcel_mailing_address.parcel_parcelkey,
-# #                 address_id=cog_tables.parcel_mailing_address.mailingaddress_addressid,
-# #             )
-# #             parcel_key = cog_tables.parcel.parcelkey
-# #         else:
-# #             _parcel = select.parcel(db, parcel_id=parcel_id)
-# #             parcel_key = _parcel.parcelkey
-# #
-# #         mailing_address_id = write_parcel_info(db, county_info.mailing, parcel_key, role=role)
-# #     # todo: I don't like how it's hard to tell what sets mailing_address_id.
-# #     else:
-# #         mailing_address_id = cog_tables.mailing_address.addressid
-# #
-# #
-# #
-# #     if county_info.owner != cog_info.owner:
-# #         if county_info is None:
-# #             raise NotImplementedError("Todo: get to cases where the cog has more info than the county")
-# #         if not (cog_tables.human is None):
-# #             deactivate.human_mailing_address(
-# #                 db,
-# #                 human_id=cog_tables.human.humanid,
-# #                 # This mailing address id is not to be changed
-# #                 mailing_id=cog_tables.mailing_address.addressid
-# #             )
-# #         write_owner_info(db, county_info.owner, mailing_address_id)
-#
-#
-# # def write_owner_info(db: Session, o: schemas.Owner, mailing_address_id: int):
-# #     pass
-# #
-# #
-# # def write_parcel_info(session: Session, m: schemas.Mailing, parcel_key: int, role: int) -> int:
-# #
-# #     try:
-# #         city_state_zip_id = select.city_state_zip_id(
-# #             session, city=m.line2.city, state=m.line2.state, zip_=m.line3.zip
-# #         )
-# #     except NoResultFound as err:
-# #         raise NotImplementedError
-# #         city_state_zip_id = insert.city_state_zip(
-# #             session, city=m.line2.city, state=m.line2.state, zip_=m.line3.zip
-# #         )
-# #
-# #     try:
-# #         street_id = select.mailing_street_id(
-# #             session, street_name=m.line1.street, city_state_zip_id=city_state_zip_id
-# #         )
-# #     except NoResultFound as err:
-# #         street_id = insert.mailing_street(
-# #             session,
-# #             street_name=m.line1.street,
-# #             city_state_zip_id=city_state_zip_id,
-# #             is_pobox=m.line1.is_pobox
-# #         )
-# #
-# #     try:
-# #         address_id = select.address_by_info(
-# #             session, street_id=street_id, number=m.line1.number
-# #         )
-# #     except NoResultFound:
-# #         address_id = insert.mailing_address(
-# #             session, street_id=street_id, number=m.line1.number
-# #         )
-# #     insert.parcel_mailing(session, address_id=address_id, parcel_key=parcel_key, role=role)
-# #     return address_id

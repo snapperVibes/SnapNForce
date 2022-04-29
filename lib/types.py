@@ -1,5 +1,5 @@
-__all__ = ["Line1", "Line2", "Line3"]
-from lib.parse._types import Line1, Line2, Line3
+__all__ = ["DeliveryAddressLine", "LastLine"]
+from lib.parse._types import DeliveryAddressLine, LastLine
 
 # Delivery Address Line
 # Last Line (of Address)

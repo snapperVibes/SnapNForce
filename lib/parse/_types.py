@@ -1,8 +1,12 @@
 from pydantic import BaseModel, validator
 from typing import Optional
 
+# Names were choosen with regards to USPS's Publication 28 - Postal Addressing Standards
+#  Delivery Address Line:    https://pe.usps.com/text/pub28/28c2_012.htm
+#  Last line of the Address: https://pe.usps.com/text/pub28/28c2_006.htm
 
-class Line1(BaseModel):
+
+class DeliveryAddressLine(BaseModel):
     is_pobox: Optional[bool]
     attn: Optional[str]
     number: Optional[str]
@@ -10,10 +14,7 @@ class Line1(BaseModel):
     secondary: Optional[str] = None
 
 
-class Line2(BaseModel):
+class LastLine(BaseModel):
     city: str
     state: str
-
-
-class Line3(BaseModel):
     zip: str

@@ -28,9 +28,9 @@ def street(db, *, city_state_zip_id, street_name, is_pobox) -> orm.MailingStreet
     )
 
 
-def address(db, *, street_id, number, attn) -> orm.MailingAddress:
+def address(db, *, street_id, number, attn, secondary) -> orm.MailingAddress:
     return _select_or_insert(
-        db, select._address, insert.mailing_address, street_id=street_id, number=number, attn=attn
+        db, select._address, insert.mailing_address, street_id=street_id, number=number, attn=attn, secondary=secondary
     )
 
 

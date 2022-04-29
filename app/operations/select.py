@@ -48,10 +48,12 @@ def address(session, address_id: int) -> orm.MailingAddress:
     return session.execute(statement).scalar_one()
 
 
-def _address(session, *, street_id: int, number: str, attn: Optional[str]) -> orm.MailingAddress:
+def _address(session, *, street_id: int, number: str, attn: Optional[str], secondary: Optional[str]) -> orm.MailingAddress:
     statement = select(orm.MailingAddress).where(
         orm.MailingAddress.street_streetid == street_id,
         orm.MailingAddress.bldgno == number,
+        orm.MailingAddress.attention == attn,
+        orm.MailingAddress.secondary == secondary,
         orm.MailingAddress.deactivatedts == None,
     )
     return session.execute(statement).scalar_one()
