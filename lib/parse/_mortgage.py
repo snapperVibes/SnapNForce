@@ -3,9 +3,9 @@ from lark import Transformer, LarkError
 from lib.parse._common import _make_parser, _extract_zip_code
 from lib.types import DeliveryAddressLine, LastLine
 
-line1_parser = _make_parser("line1")
+mortgage_parser = _make_parser("mortgage")
 
-class LineOneTransformer(Transformer):
+class MortgageTransformer(Transformer):
     def __init__(self):
         super().__init__()
         self._attn = None
@@ -61,8 +61,8 @@ class LineOneTransformer(Transformer):
 # Todo: Research standalone parser
 def mortgage_delivery_address_line(text: str) -> DeliveryAddressLine:
     try:
-        tree = line1_parser.parse(text)
-        return LineOneTransformer().transform(tree)
+        tree = mortgage_parser.parse(text)
+        return MortgageTransformer().transform(tree)
     except LarkError as err:
         msg = str(err)
         print(msg)
