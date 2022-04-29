@@ -1,27 +1,24 @@
 start: secure_unit | regular
 
-regular: (attention_clause _SEP)? (building_number _SEP)? street secondary?
-building_number . 1: NUMBER
+regular: building_number? street type? secondary?
+building_number: (WORD _SEP*)+ _END
+street: (WORD _SEP*)+ _END
+type: TYPE_IDENTIFIER _END
+secondary: ((secondary_that_requires_range _SEP* _END range) | (secondary_with_optional_range (_END range)?)) _END
 
-street: (WORD _SEP*)+ type_indentifier?
-secure_unit: pobox_clause (_SEP attention_clause)?
-    | (attention_clause _SEP+)? pobox_clause
-attention_clause: (attention_signifier _SEP+)? attention_subject
-attention_signifier . 1: "ATTENTION" | "ATTN" | "C/O"
-attention_subject: (WORD _SEP*)+
-pobox_clause: pobox_signifier _SEP+ pobox_number
+secure_unit: pobox_clause
+pobox_clause: pobox_signifier _SEP+ pobox_number _END
 pobox_signifier . 1: "PO BOX" | "P O BOX" -> pobox_signifier
 pobox_number: NUMBER
 
 _SEP: COMMA | COLON | SPACE
+_END: "\xa0"  // Nonbreaking space
 COMMA: ","
 COLON: ":"
 SPACE: /\s/
 WORD : /[\w&-]+-*/
 NUMBER: /\d+/
-
-?type_indentifier .1: STREET_TYPE
-STREET_TYPE: "ALY" | "ANX" | "ARC" | "AVE" | "BYU" | "BCH" | "BND" | "BLFS" | "BTM" | "BLVD" | "BR" | "BRG" | "BRK"
+TYPE_IDENTIFIER: "ALY" | "ANX" | "ARC" | "AVE" | "BYU" | "BCH" | "BND" | "BLFS" | "BTM" | "BLVD" | "BR" | "BRG" | "BRK"
 	| "BG" | "BGS" | "BYP" | "CP" | "CYN" | "CSWY" | "CTR" | "CTRS" | "CIR" | "CIRS" | "CLF" | "CLFS" | "CLB" | "CMN"
 	| "CMNS" | "COR" | "CORS" | "CRSE" | "CT" | "CTS" | "CV" | "CVS" | "CRK" | "CRES" | "CRST" | "XING" | "XRD" | "XRDS"
 	| "CURV" | "DL" | "DM" | "DV" | "DR" | "DRS" | "EST" | "ESTS" | "EXPY" | "EXT" | "EXTS" | "FALL" | "FLS" | "FRY"
@@ -37,9 +34,6 @@ STREET_TYPE: "ALY" | "ANX" | "ARC" | "AVE" | "BYU" | "BCH" | "BND" | "BLFS" | "B
 	| "UPAS" | "UN" | "UNS" | "VLY" | "VLYS" | "VIA" | "VW" | "VWS" | "VLG" | "VLGS" | "VL" | "VIS" | "WALK" | "WALL"
 	| "WAY" | "WAYS" | "WL" | "WLS"
 
-
-
-secondary: ((secondary_that_requires_range _SEP+ range) | (secondary_with_optional_range (_SEP+ range)?))
 secondary_that_requires_range: SECONDARY_THAT_REQUIRES_RANGE
 secondary_with_optional_range: SECONDARY_WITH_OPTIONAL_RANGE
 SECONDARY_THAT_REQUIRES_RANGE: "APT" | "BLDG" | "DEPT" | "FL" | "HNGR" | "KEY" | "LOT" | "PIER" | "RM" | "SLIP" | "SPC"
