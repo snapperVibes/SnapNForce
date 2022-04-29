@@ -1,8 +1,12 @@
-import uvicorn
 import logging
-from os import path
+import os
 
-logging.basicConfig(filename=path.join("log", "demo.log"), filemode="a")
+import uvicorn
 
 if __name__ == "__main__":
+    _LOG_FOLDER = "log"
+    if not os.path.exists(_LOG_FOLDER):
+        os.makedirs(_LOG_FOLDER)
+    logging.basicConfig(filename=os.path.join(_LOG_FOLDER, "demo.log"), filemode="a")
+
     uvicorn.run("app.app:app", reload=True)

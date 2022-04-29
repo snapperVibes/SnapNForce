@@ -1,8 +1,8 @@
 import pytest
 
 import app
-from lib.parse import line1 as parse
-from lib.parse._types import Line1
+from lib.parse import mortgage_delivery_address_line as parse
+from lib.parse._types import DeliveryAddressLine
 from lark.exceptions import UnexpectedEOF
 
 # test format
@@ -17,19 +17,19 @@ from lark.exceptions import UnexpectedEOF
 
 def test_001():
     a = parse("ATTENTION: BILLS RECIEVED PO BOX 9201")
-    e = Line1(is_pobox=True, attn="BILLS RECIEVED", number="9201", street="PO BOX")
+    e = DeliveryAddressLine(is_pobox=True, attn="BILLS RECIEVED", number="9201", street="PO BOX")
     assert a == e
 
 
 def test_002():
     a = parse("569 HELENA ST")
-    e = Line1(is_pobox=False, attn=None, number="569", street="HELENA ST")
+    e = DeliveryAddressLine(is_pobox=False, attn=None, number="569", street="HELENA ST")
     assert a == e
 
 
 def test_003():
     a = parse("SELECT PORTFOLIO SERVICING - DISBURSEMENT UNIT 901 CORPORATE CENTER")
-    e = Line1(
+    e = DeliveryAddressLine(
         is_pobox=False,
         attn="SELECT PORTFOLIO SERVICING - DISBURSEMENT UNIT",
         number="901",
@@ -40,13 +40,15 @@ def test_003():
 
 def test_004():
     a = parse("MORELLE AVE")
-    e = Line1(is_pobox=False, attn=None, number=None, street="MORELLE AVE")
+    e = DeliveryAddressLine(is_pobox=False, attn=None, number=None, street="MORELLE AVE")
     assert a == e
 
 
 def test_005():
     a = parse("111 WESTPORT PLZ STE 1150")
-    e = Line1(is_pobox=False, attn=None, number="111", street="WESTPORT PLZ", secondary="STE 1150")
+    e = DeliveryAddressLine(
+        is_pobox=False, attn=None, number="111", street="WESTPORT PLZ", secondary="STE 1150"
+    )
     assert a == e
 
 

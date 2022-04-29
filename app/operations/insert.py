@@ -71,11 +71,11 @@ def street(session, *, street_name, city_state_zip_id, is_pobox) -> orm.MailingS
 
 @_insert_event("mailing address", requires_code_officer_approval=False)
 def mailing_address(
-    session, *, street_id: int, number: str, attn: Optional[str]
+    session, *, street_id: int, number: str, attn: Optional[str], secondary: Optional[str]
 ) -> orm.MailingAddress:
     statement = (
         insert(orm.MailingAddress)
-        .values(bldgno=number, street_streetid=street_id, attention=attn, **_common)
+        .values(bldgno=number, street_streetid=street_id, attention=attn, secondary=secondary, **_common)
         .returning(orm.MailingAddress)
     )
     return session.execute(statement).one()

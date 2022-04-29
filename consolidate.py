@@ -3,7 +3,7 @@ One off script to add a database integrity check to ensure
 multiple mailingaddress referring to the same building cannot be active at the same time
 """
 from sqlalchemy import text
-from app.database import _get_db2, Connection
+from app.database import get_db_context, Connection
 from app.operations._common import USER_ID
 
 
@@ -97,7 +97,7 @@ def consolidate_parcels(conn: Connection):
 
 
 def main():
-    with _get_db2() as conn:
+    with get_db_context() as conn:
         with conn.begin():
             consolidate_mailing_addresses(conn)
             consolidate_parcels(conn)
@@ -108,4 +108,4 @@ def main():
 conn: Connection  # This is a type hint
 if __name__ == "__main__":
     main()
-    # print("Consolidated mailing addresses")
+    print("Script ran 👍")

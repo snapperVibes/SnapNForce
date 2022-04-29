@@ -1,7 +1,7 @@
 # fmt: off
 from lark import Transformer, LarkError
 from lib.parse._common import _make_parser, _extract_zip_code
-from lib.types import Line1, Line2, Line3
+from lib.types import DeliveryAddressLine, LastLine
 
 line1_parser = _make_parser("line1")
 
@@ -50,7 +50,7 @@ class LineOneTransformer(Transformer):
         if self._is_pobox:
             assert self._street is None
             self._street = "PO BOX"
-        return Line1(
+        return DeliveryAddressLine(
             is_pobox=self._is_pobox,
             attn=self._attn,
             number=self._number,
@@ -59,7 +59,7 @@ class LineOneTransformer(Transformer):
         )
 
 # Todo: Research standalone parser
-def line1(text: str) -> Line1:
+def mortgage_delivery_address_line(text: str) -> DeliveryAddressLine:
     try:
         tree = line1_parser.parse(text)
         return LineOneTransformer().transform(tree)
@@ -70,9 +70,7 @@ def line1(text: str) -> Line1:
         #  Let's log a detailed error message so fixing it is easy.
         raise
 
-def line2(text: str) -> Line2:
-    city, state = text.split("  ")
-    return Line2(city=city, state=state)
-
-def line3(text: str) -> Line3:
-    return Line3(zip=_extract_zip_code(text))
+def mortgage_last_line(city_state: str, zip: str) -> LastLine:
+    city, state = city_state.split("  ")
+    zip = _extract_zip_code(zip)
+    return LastLine(city=city, state=state, zip=zip)

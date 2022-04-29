@@ -37,6 +37,7 @@ class MailingAddress(_TableWithMetaData, table=True):
     bldgno: Optional[str]
     street_streetid: int = Field(foreign_key="mailingstreet.streetid")
     attention: Optional[str]
+    secondary: Optional[str]
 
 
 class MailingStreet(_TableWithMetaData, table=True):

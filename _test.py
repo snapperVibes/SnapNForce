@@ -4,7 +4,7 @@ from os import path
 from sqlalchemy import text
 from sqlalchemy.engine import Connection
 
-from app.database import _get_db2, SessionLocal
+from app.database import get_db_context, SessionLocal
 from app.lib import sync_parcel_data
 
 logging.basicConfig(filename=path.join("log", "_test.log"), filemode="a", level=logging.INFO)
@@ -19,11 +19,11 @@ def get_parcel_ids(conn: Connection):
 
 
 # SKIP_TO = 5
-SKIP_TO = 196
+SKIP_TO = 204
 
 logging.info("Having another go at it 🙂")
 if __name__ == "__main__":
-    with _get_db2() as conn:
+    with get_db_context() as conn:
         parcel_ids = get_parcel_ids(conn)
     with SessionLocal() as db:
         for i, parcel_id in enumerate(parcel_ids):

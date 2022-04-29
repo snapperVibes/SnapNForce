@@ -2,7 +2,7 @@ from typing import Optional
 
 from sqlmodel import SQLModel
 from app import orm
-from lib.types import Line1, Line2, Line3
+from lib.types import DeliveryAddressLine, LastLine
 
 
 class Owner(SQLModel):
@@ -11,9 +11,8 @@ class Owner(SQLModel):
 
 
 class Mailing(SQLModel):
-    line1: Line1
-    line2: Line2
-    line3: Line3
+    delivery: DeliveryAddressLine
+    last: LastLine
 
 
 class OwnerAndMailing(SQLModel):

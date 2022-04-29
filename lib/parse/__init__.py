@@ -5,13 +5,12 @@
 __all__ = [
     "general_content",
     "tax_content",
-    "line1",
-    "line2",
-    "line3",
+    "mortgage_delivery_address_line",
+    "mortgage_last_line",
     "city_state_zip",
-    "general_street_line",
+    "general_delivery_address_line",
     "city_state_zip",
 ]
 from lib.parse.county_html import general_content, tax_content
-from lib.parse._mortgage import line1, line2, line3
-from lib.parse._general import general_street_line, city_state_zip
+from lib.parse._mortgage import mortgage_delivery_address_line, mortgage_last_line
+from lib.parse._general import general_delivery_address_line, city_state_zip
