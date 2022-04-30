@@ -1,13 +1,12 @@
 import logging
-from time import sleep
 from functools import wraps
 from typing import Optional
 
-from sqlmodel import insert
 from sqlalchemy.sql import func
+from sqlmodel import insert
+
 from app import orm
 from app.operations._common import USER_ID
-
 
 _common = {
     "createdts": func.now(),
