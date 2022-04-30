@@ -37,8 +37,6 @@ STREET_TYPE: "ALY" | "ANX" | "ARC" | "AVE" | "BYU" | "BCH" | "BND" | "BLFS" | "B
 	| "UPAS" | "UN" | "UNS" | "VLY" | "VLYS" | "VIA" | "VW" | "VWS" | "VLG" | "VLGS" | "VL" | "VIS" | "WALK" | "WALL"
 	| "WAY" | "WAYS" | "WL" | "WLS"
 
-
-
 secondary: ((secondary_that_requires_range _SEP+ range) | (secondary_with_optional_range (_SEP+ range)?))
 secondary_that_requires_range: SECONDARY_THAT_REQUIRES_RANGE
 secondary_with_optional_range: SECONDARY_WITH_OPTIONAL_RANGE
