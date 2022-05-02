@@ -3,7 +3,8 @@ One off script to add a database integrity check to ensure
 multiple mailingaddress referring to the same building cannot be active at the same time
 """
 from sqlalchemy import text
-from app.database import get_db_context, Connection
+from sqlalchemy.engine import Connection
+from app.database import get_db_context
 from app.operations._common import USER_ID
 
 
@@ -28,8 +29,8 @@ def consolidate_mailing_addresses(conn: Connection):
         old_dups = dups[1:]
         statement = text(
             "UPDATE mailingaddress"
-            "  SET deactivatedts=now()"
-            "  AND deactivatedby_userid=:user_id"
+            "  SET deactivatedts=now(),"
+            "  deactivatedby_userid=:user_id"
             "  WHERE addressid = ANY(:old_dups)"
         ).bindparams(old_dups=old_dups, user_id=USER_ID)
         conn.execute(statement)
