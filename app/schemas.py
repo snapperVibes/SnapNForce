@@ -2,7 +2,7 @@ from typing import Optional
 
 from sqlmodel import SQLModel
 from app import orm
-from lib.types import DeliveryAddressLine, LastLine
+from lib.models import DeliveryAddressLine, LastLine
 
 
 class Owner(SQLModel):

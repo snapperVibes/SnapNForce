@@ -1,7 +1,7 @@
 # fmt: off
 from lark import Transformer, LarkError
 from lib.parse._common import _make_parser, _extract_zip_code
-from lib.types import DeliveryAddressLine, LastLine
+from lib.models import DeliveryAddressLine, LastLine
 
 mortgage_parser = _make_parser("mortgage")
 

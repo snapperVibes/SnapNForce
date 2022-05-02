@@ -16,8 +16,8 @@ from app.schemas import CogGeneralAndMortgage
 from lib import scrape, parse
 
 
-def sync_parcel_data(db: Session, parcel_id: str) -> schemas.GeneralAndMortgage:
-    _county_data = get_parcel_data_from_county(parcel_id)
+async def sync_parcel_data(db: Session, parcel_id: str) -> schemas.GeneralAndMortgage:
+    _county_data = await get_parcel_data_from_county(parcel_id)
     _cog_tables = get_cog_tables(db, parcel_id)
 
     out = {GENERAL_LINKED_OBJECT_ROLE: None, MORTGAGE_LINKED_OBJECT_ROLE: None}
@@ -108,25 +108,25 @@ def _sync_owner_and_mailing(db, county: schemas.OwnerAndMailing, cog: Optional[s
     return schemas.OwnerAndMailing(owner=owner, mailing=mailing)
 
 
-def get_parcel_data_from_county(parcel_id: str) -> schemas.GeneralAndMortgage:
-    general_data = get_general_data_from_county(parcel_id)
-    tax_data = get_tax_data_from_county(parcel_id)
+async def get_parcel_data_from_county(parcel_id: str) -> schemas.GeneralAndMortgage:
+    general_data = await get_general_data_from_county(parcel_id)
+    tax_data = await get_tax_data_from_county(parcel_id)
     return schemas.GeneralAndMortgage(general=general_data, mortgage=tax_data)
 
 
-def get_general_data_from_county(parcel_id: str):
-    response = scrape.general_info(parcel_id)
+async def get_general_data_from_county(parcel_id: str):
+    response = await scrape.general_info(parcel_id)
     response.raise_for_status()
-    _owner, _mailing = parse.general_content(response.content)
+    _owner, _mailing = parse.general_html_content(response.content)
     owner = owner_from_raw(_owner)
     mailing = mailing_from_raw_general(_mailing)
     return schemas.OwnerAndMailing(owner=owner, mailing=mailing)
 
 
-def get_tax_data_from_county(parcel_id: str):
-    response = scrape.tax_info(parcel_id)
+async def get_tax_data_from_county(parcel_id: str):
+    response = await scrape.tax_info(parcel_id)
     response.raise_for_status()
-    _owner, _mailing = parse.tax_content(response.content)
+    _owner, _mailing = parse.mortgage_html_content(response.content)
     owner = owner_from_raw(_owner)
     mailing = mailing_from_raw_tax(_mailing)
     return schemas.OwnerAndMailing(owner=owner, mailing=mailing)
@@ -166,12 +166,12 @@ def mailing_from_raw_general(data: list[Tag | NavigableString]) -> Optional[sche
     address_list = _clean_tags(data)
     if len(address_list) == 2:
         delivery_line = parse.general_delivery_address_line(address_list[0])
-        last_line = parse.city_state_zip(address_list[1])
+        last_line = parse.general_city_state_zip(address_list[1])
     elif len(address_list) == 3:
         delivery_line = parse.general_delivery_address_line(address_list[1])
         # "ATTN ", "ATTN: ", "ATTENTION ", "ATTENTION: "
         delivery_line.attn = re.sub(r"ATT(N|ENTION):?\s+", address_list[0], "")
-        last_line = parse.city_state_zip(address_list[2])
+        last_line = parse.general_city_state_zip(address_list[2])
     elif len(address_list) == 0:
         return None
     else:

@@ -1,7 +1,7 @@
 # fmt: off
 from lark import Transformer, LarkError
 from lib.parse._common import _make_parser, _extract_zip_code
-from lib.parse._types import DeliveryAddressLine, LastLine
+from lib.parse.models import DeliveryAddressLine, LastLine
 
 general_parser = _make_parser("general")
 
@@ -63,7 +63,6 @@ class GeneralTransformer(Transformer):
             secondary=self._secondary
         )
 
-# TODO: NAMING
 def general_delivery_address_line(text: str) -> DeliveryAddressLine:
     try:
         tree = general_parser.parse(text)
@@ -73,7 +72,6 @@ def general_delivery_address_line(text: str) -> DeliveryAddressLine:
         print(str(err))
         raise
 
-def city_state_zip(text: str) -> LastLine:
-    # Todo: naming. This is for the "general" case, compared to the "mortgage" case
+def general_city_state_zip(text: str) -> LastLine:
     city, _comma, state, zip_ = text.split("\xa0")
     return LastLine(city=city, state=state, zip=_extract_zip_code(zip_))

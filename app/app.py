@@ -16,10 +16,10 @@ def root():
 
 
 @app.get("/parcel/get-data", response_model=schemas.GeneralAndMortgage)
-def get_data(id: str):
-    return lib.get_parcel_data_from_county(id)
+async def get_data(id: str):
+    return await lib.get_parcel_data_from_county(id)
 
 
 @app.get("/parcel/sync", response_model=schemas.GeneralAndMortgage)
-def sync(id: str, db: Session = Depends(get_db)):
-    return lib.sync_parcel_data(db, parcel_id=id)
+async def sync(id: str, db: Session = Depends(get_db)):
+    return await lib.sync_parcel_data(db, parcel_id=id)

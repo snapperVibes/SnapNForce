@@ -12,15 +12,26 @@ APPEAL = "Appeal"
 MAP = "Map"
 
 
-def general_info(parcel_id: str) -> httpx.Response:
-    return _county_property_assessment(parcel_id, section=GENERALINFO)
+_client = {"async": None}
 
 
-def tax_info(parcel_id: str) -> httpx.Response:
-    return _county_property_assessment(parcel_id, section=TAX)
+def _get_async_client():
+    client = _client.get("async")
+    if client is None:
+        # Todo: add explicit Turtle Creek headers
+        client = _client["async"] = httpx.AsyncClient()
+    return client
 
 
-def _county_property_assessment(parcel_id: str, section: str) -> httpx.Response:
+async def general_info(parcel_id: str) -> httpx.Response:
+    return await _county_property_assessment(parcel_id, section=GENERALINFO)
+
+
+async def tax_info(parcel_id: str) -> httpx.Response:
+    return await _county_property_assessment(parcel_id, section=TAX)
+
+
+async def _county_property_assessment(parcel_id: str, section: str) -> httpx.Response:
     COUNTY_REAL_ESTATE_URL = "https://www2.county.allegheny.pa.us/RealEstate/"
     URL_ENDING = ".aspx?"
     search_parameters = {
@@ -28,7 +39,8 @@ def _county_property_assessment(parcel_id: str, section: str) -> httpx.Response:
         "SearchType": 3,
         "SearchParcel": parcel_id,
     }
-    return httpx.get(
+    client = _get_async_client()
+    return await client.get(
         (COUNTY_REAL_ESTATE_URL + section + URL_ENDING),
         params=search_parameters,
         timeout=5,
