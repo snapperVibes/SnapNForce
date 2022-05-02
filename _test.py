@@ -1,5 +1,6 @@
 import logging
 from os import path
+from time import sleep
 
 from sqlalchemy import text
 from sqlalchemy.engine import Connection
@@ -33,8 +34,10 @@ async def main():
             logging.info(f"Parcel:\t{parcel_id}\tNumber:\t{i}")
             d = await sync_parcel_data(db, parcel_id)
             print("\n")
-            print(f"{i}\t{parcel_id}\n" f"GENERAL:\t{d.general}\n" f"MORTGAGE:\t{d.mortgage}\n")
+            print(f"{i}\t{parcel_id}\n" f"GENERAL:\t{d.general}\n" f"MORTGAGE:\t{d.mortgage}")
             print("\n" + "-" * 89)
+            # Let's be polite neighbors
+            sleep(.75)
 
 logging.info("Having another go at it 🙂")
 if __name__ == "__main__":
