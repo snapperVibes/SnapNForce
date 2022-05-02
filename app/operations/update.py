@@ -1,4 +1,4 @@
-import  warnings
+import warnings
 
 
 def city_state_zip_timestamp(db, city_state_zip_id):

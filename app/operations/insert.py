@@ -74,7 +74,13 @@ def mailing_address(
 ) -> orm.MailingAddress:
     statement = (
         insert(orm.MailingAddress)
-        .values(bldgno=number, street_streetid=street_id, attention=attn, secondary=secondary, **_common)
+        .values(
+            bldgno=number,
+            street_streetid=street_id,
+            attention=attn,
+            secondary=secondary,
+            **_common,
+        )
         .returning(orm.MailingAddress)
     )
     return session.execute(statement).one()
