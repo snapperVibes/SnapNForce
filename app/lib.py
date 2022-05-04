@@ -144,7 +144,7 @@ def owner_from_raw(data: list[Tag | NavigableString]) -> schemas.Owner:
     clean_owner = _clean_whitespace(dirty_owner)
     if dirty_owner != clean_owner:  # Todo:
         # Todo: this is most likely duplicate logic,
-        #  but I haven't thought to prove it yet
+        #  but I haven't taken time to prove it yet
         is_multi_entity = True
     return schemas.Owner(name=clean_owner, is_multi_entity=is_multi_entity)
 
