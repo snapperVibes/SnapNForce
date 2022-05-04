@@ -57,7 +57,7 @@ def _sync_owner_and_mailing(db, county: schemas.OwnerAndMailing, cog: Optional[s
 
     address_is_same: bool
     if cog is not None:
-        cog_line_1 = schemas.DeliveryAddressLine(is_pobox=cog.street.pobox, attn=cog.address.attention, number=cog.address.bldgno, street=cog.street.name)
+        cog_line_1 = schemas.DeliveryAddressLine(is_pobox=cog.street.pobox, attn=cog.address.attention, number=cog.address.bldgno, street=cog.street.name, secondary=cog.address.secondary)
         cog_line_2 = schemas.LastLine(city=cog.city_state_zip.city, state=cog.city_state_zip.state_abbr, zip=cog.city_state_zip.zip_code)
         address_is_same = all(
             (x == y)
@@ -96,7 +96,7 @@ def _sync_owner_and_mailing(db, county: schemas.OwnerAndMailing, cog: Optional[s
     mailing = None
     if city_state_zip is not None:
         mailing = schemas.Mailing(
-            delivery=schemas.DeliveryAddressLine(is_pobox=street.pobox, attn=address.attention, number=address.bldgno, street=street.name),
+            delivery=schemas.DeliveryAddressLine(is_pobox=street.pobox, attn=address.attention, number=address.bldgno, street=street.name, seconday=address.secondary),
             last=schemas.LastLine(city=city_state_zip.city, state=city_state_zip.state_abbr, zip=city_state_zip.zip_code)
         )
 

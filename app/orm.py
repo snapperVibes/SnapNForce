@@ -28,7 +28,7 @@ class Parcel(_TableWithMetaData, table=True):
 class ParcelMailingAddress(_TableWithMetaData, table=True):
     parcel_parcelkey: int = Field(foreign_key="parcel.parcelkey", primary_key=True)
     mailingaddress_addressid: int = Field(foreign_key="mailingAddress.addressid", primary_key=True)
-    linkedobjectrole_lorid: int = Field(foreign_key="linkedobjectrole.roleid")
+    linkedobjectrole_lorid: int = Field(foreign_key="linkedobjectrole.lorid")
 
 
 class MailingAddress(_TableWithMetaData, table=True):

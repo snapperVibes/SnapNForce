@@ -103,10 +103,8 @@ def main():
             consolidate_mailing_addresses(conn)
             consolidate_parcels(conn)
             conn.commit()
-    print("nice")
 
 
-conn: Connection  # This is a type hint
 if __name__ == "__main__":
     main()
     print("Script ran 👍")

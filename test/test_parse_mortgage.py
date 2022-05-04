@@ -2,7 +2,7 @@ import pytest
 
 import app
 from lib.parse import mortgage_delivery_address_line as parse
-from lib.parse._types import DeliveryAddressLine
+from lib.models import DeliveryAddressLine
 from lark.exceptions import UnexpectedEOF
 
 # test format

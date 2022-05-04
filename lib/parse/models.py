@@ -11,7 +11,7 @@ class DeliveryAddressLine(BaseModel):
     attn: Optional[str]
     number: Optional[str]
     street: Optional[str]
-    secondary: Optional[str] = None
+    secondary: Optional[str]
 
 
 class LastLine(BaseModel):
