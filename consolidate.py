@@ -68,7 +68,8 @@ def consolidate_parcels(conn: Connection):
             ).params({"parcel_key": parcel_key})
             address_id, parcel_mailing_deactivated = conn.execute(SELECT_PARCEL_MAILING).one()
             SELECT_ADDRESS = text(
-                "SELECT deactivatedts FROM mailingaddress WHERE" "  addressid = :address_id"
+                "SELECT deactivatedts FROM mailingaddress WHERE" 
+                "  addressid = :address_id"
             ).params({"address_id": address_id})
             mailing_deactivated = conn.execute(SELECT_ADDRESS).scalar_one()
 

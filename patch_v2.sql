@@ -1,7 +1,7 @@
 BEGIN;
 -- New Linked object role
 INSERT INTO linkedobjectrole (lorid, lorschema, title, description, createdts, deactivatedts, notes) VALUES
-	(233, 'ParcelMailingaddress', 'general mailing address', null, now(), null, null), (234, 'ParcelMailingaddress', 'mortgage mailing address', null, now(), null, null);
+	(233, 'ParcelMailingaddress', 'owner mailing address', null, now(), null, null), (234, 'ParcelMailingaddress', 'mortgage mailing address', null, now(), null, null);
 
 -- ALTER TABLE public.parcelmailingaddress ADD CONSTRAINT parcelmailingaddress_mailingaddressid_fk
 --     FOREIGN KEY (mailingparcel_mailingid) REFERENCES mailingaddress (addressid);

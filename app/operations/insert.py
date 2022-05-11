@@ -1,5 +1,6 @@
 import logging
 from functools import wraps
+from time import sleep
 from typing import Optional
 
 from sqlalchemy.sql import func
@@ -22,8 +23,8 @@ def _insert_event(name: str, requires_code_officer_approval: bool):
         def wrapper(*args, **kwargs):
             if requires_code_officer_approval:
                 logging.warning(f"NEEDS OFFICER APPROVAL: {name}\t{kwargs}")
-                # print(f"Seeking approval to insert {name}. {kwargs}")
-                # sleep(2)
+                print(f"Seeking approval to insert {name}. {kwargs}")
+                sleep(2)
             return func(*args, **kwargs)
 
         return wrapper

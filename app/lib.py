@@ -27,7 +27,7 @@ async def sync_parcel_data(db: Session, parcel_id: str) -> schemas.GeneralAndMor
         (_cog_tables.general,        _cog_tables.mortgage),
         (GENERAL_LINKED_OBJECT_ROLE, MORTGAGE_LINKED_OBJECT_ROLE)
     ):
-        out[role] = _sync_owner_and_mailing(db, county, cog)
+        out[role] = _sync_owner_and_mailing(db, county, cog, role)
 
     return schemas.GeneralAndMortgage(
         general=out[GENERAL_LINKED_OBJECT_ROLE],
@@ -35,7 +35,7 @@ async def sync_parcel_data(db: Session, parcel_id: str) -> schemas.GeneralAndMor
     )
 
 
-def _sync_owner_and_mailing(db, county: schemas.OwnerAndMailing, cog: Optional[schemas.CogTables]) -> schemas.OwnerAndMailing:
+def _sync_owner_and_mailing(db, county: schemas.OwnerAndMailing, cog: Optional[schemas.CogTables], role: int) -> schemas.OwnerAndMailing:
     # Todo: This is one of the messiest functions in the code. Refactor
     # SYNC MAILING
 
@@ -57,11 +57,10 @@ def _sync_owner_and_mailing(db, county: schemas.OwnerAndMailing, cog: Optional[s
 
     address_is_same: bool
     if cog is not None:
-        cog_line_1 = schemas.DeliveryAddressLine(is_pobox=cog.street.pobox, attn=cog.address.attention, number=cog.address.bldgno, street=cog.street.name, secondary=cog.address.secondary)
-        cog_line_2 = schemas.LastLine(city=cog.city_state_zip.city, state=cog.city_state_zip.state_abbr, zip=cog.city_state_zip.zip_code)
+        cog_delivery = schemas.DeliveryAddressLine(is_pobox=cog.street.pobox, attn=cog.address.attention, number=cog.address.bldgno, street=cog.street.name, secondary=cog.address.secondary)
+        cog_last = schemas.LastLine(city=cog.city_state_zip.city, state=cog.city_state_zip.state_abbr, zip=cog.city_state_zip.zip_code)
         address_is_same = all(
-            (x == y)
-            for x, y in zip([m.delivery, m.last], [cog_line_1, cog_line_2])
+            (x == y) for x, y in zip([m.delivery, m.last], [cog_delivery, cog_last])
         )
     else:
         address_is_same = True
@@ -70,7 +69,7 @@ def _sync_owner_and_mailing(db, county: schemas.OwnerAndMailing, cog: Optional[s
         if address is not None:
             deactivate.parcel_mailing_address(db, parcel_key=cog.parcel.parcelkey, address_id=address.addressid)
             insert.parcel_mailing(
-                db, parcel_key=cog.parcel.parcelkey, address_id=address.addressid, role=GENERAL_LINKED_OBJECT_ROLE
+                db, parcel_key=cog.parcel.parcelkey, address_id=address.addressid, role=role
             )
 
     # SYNC OWNER
