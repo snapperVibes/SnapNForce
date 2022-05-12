@@ -33,7 +33,6 @@ class ParcelMailingAddress(_TableWithMetaData, table=True):
 
 class MailingAddress(_TableWithMetaData, table=True):
     addressid: int = Field(primary_key=True)
-    attn: Optional[str]
     bldgno: Optional[str]
     street_streetid: int = Field(foreign_key="mailingstreet.streetid")
     attention: Optional[str]
