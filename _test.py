@@ -21,6 +21,7 @@ def get_parcel_ids(conn: Connection):
 
 SKIP_TO = 0
 
+
 async def main():
     with get_db_context() as conn:
         parcel_ids = get_parcel_ids(conn)
@@ -37,11 +38,11 @@ async def main():
             print(f"{i}\t{parcel_id}\n" f"GENERAL:\t{d.general}\n" f"MORTGAGE:\t{d.mortgage}")
             print("\n" + "-" * 89)
             # Let's be polite neighbors
-            sleep(.75)
+            sleep(0.75)
+
 
 logging.info("Having another go at it 🙂")
 if __name__ == "__main__":
     import asyncio
+
     asyncio.run(main())
-
-

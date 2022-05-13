@@ -5,7 +5,7 @@ multiple mailingaddress referring to the same building cannot be active at the s
 from sqlalchemy import text
 from sqlalchemy.engine import Connection
 from app.database import get_db_context
-from app.operations._common import USER_ID
+from constants._common import USER_ID
 
 
 def consolidate_mailing_addresses(conn: Connection):
@@ -68,8 +68,7 @@ def consolidate_parcels(conn: Connection):
             ).params({"parcel_key": parcel_key})
             address_id, parcel_mailing_deactivated = conn.execute(SELECT_PARCEL_MAILING).one()
             SELECT_ADDRESS = text(
-                "SELECT deactivatedts FROM mailingaddress WHERE" 
-                "  addressid = :address_id"
+                "SELECT deactivatedts FROM mailingaddress WHERE" "  addressid = :address_id"
             ).params({"address_id": address_id})
             mailing_deactivated = conn.execute(SELECT_ADDRESS).scalar_one()
 
