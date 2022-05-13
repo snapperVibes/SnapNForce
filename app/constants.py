@@ -24,7 +24,9 @@ class LinkedObjectRole:
     @classmethod
     @property
     def address_roles(cls):
-        return _GeneralAndMortgageRoles(cls.GENERAL_HUMAN_MAILING_ADDRESS, cls.MORTGAGE_HUMAN_MAILING_ADDRESS)
+        return _GeneralAndMortgageRoles(
+            cls.GENERAL_HUMAN_MAILING_ADDRESS, cls.MORTGAGE_HUMAN_MAILING_ADDRESS
+        )
 
     @classmethod
     @property
@@ -34,7 +36,7 @@ class LinkedObjectRole:
     @classmethod
     @property
     def property_address_roles(cls):
-        return cls.COUNTY_PROPERTY_ADDRESS,
+        return (cls.COUNTY_PROPERTY_ADDRESS,)
 
 
 USER_ID = 99  # the id of "sylvia". Todo: new user id

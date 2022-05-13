@@ -4,7 +4,7 @@ from time import sleep
 
 from sqlalchemy import text
 from sqlalchemy.engine import Connection
-
+from sqlalchemy.exc import MultipleResultsFound
 from app.database import get_db_context, SessionLocal
 from app.lib import sync_parcel_data
 
@@ -19,7 +19,7 @@ def get_parcel_ids(conn: Connection):
     return [i[0] for i in cursor_result]
 
 
-SKIP_TO = 0
+SKIP_TO = 1
 
 
 async def main():
@@ -33,10 +33,15 @@ async def main():
             # cog_data = get_cog_tables(parcel_id)
             # print(parcel_id, cog_data, sep="\t")
             logging.info(f"Parcel:\t{parcel_id}\tNumber:\t{i}")
-            d = await sync_parcel_data(db, parcel_id)
-            print("\n")
-            print(f"{i}\t{parcel_id}\n" f"GENERAL:\t{d.general}\n" f"MORTGAGE:\t{d.mortgage}")
-            print("\n" + "-" * 89)
+
+            try:
+                d = await sync_parcel_data(db, parcel_id)
+                print("\n")
+                print(f"{i}\t{parcel_id}\n" f"GENERAL:\t{d.general}\n" f"MORTGAGE:\t{d.mortgage}")
+                print("\n" + "-" * 89)
+            except MultipleResultsFound as err:
+                print(f"MULTIPLE RESULTS on {parcel_id}")
+                logging.error(err)
             # Let's be polite neighbors
             sleep(0.75)
 

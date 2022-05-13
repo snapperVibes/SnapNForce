@@ -4,7 +4,7 @@ from typing import Optional
 from sqlmodel import SQLModel, Field
 
 
-class _TableWithMetaData(SQLModel):
+class _BaseModel(SQLModel):
     createdts: Optional[DateTime]
     createdby_userid: Optional[int] = Field(foreign_key="login.userid")
     lastupdatedts: Optional[DateTime]
@@ -13,7 +13,7 @@ class _TableWithMetaData(SQLModel):
     deactivatedby_userid: Optional[int] = Field(foreign_key="login.userid")
 
 
-class Parcel(_TableWithMetaData, table=True):
+class Parcel(_BaseModel, table=True):
     parcelkey: int = Field(primary_key=True)
     parcelidcnty: str
     deactivatedts: Optional[DateTime] = None
@@ -25,13 +25,7 @@ class Parcel(_TableWithMetaData, table=True):
         return f"https://www2.alleghenycounty.us/RealEstate/GeneralInfo.aspx?ParcelID={self.parcelidcnty}"
 
 
-class ParcelMailingAddress(_TableWithMetaData, table=True):
-    parcel_parcelkey: int = Field(foreign_key="parcel.parcelkey", primary_key=True)
-    mailingaddress_addressid: int = Field(foreign_key="mailingAddress.addressid", primary_key=True)
-    linkedobjectrole_lorid: int = Field(foreign_key="linkedobjectrole.lorid")
-
-
-class MailingAddress(_TableWithMetaData, table=True):
+class MailingAddress(_BaseModel, table=True):
     addressid: int = Field(primary_key=True)
     bldgno: Optional[str]
     street_streetid: int = Field(foreign_key="mailingstreet.streetid")
@@ -39,27 +33,46 @@ class MailingAddress(_TableWithMetaData, table=True):
     secondary: Optional[str]
 
 
-class MailingStreet(_TableWithMetaData, table=True):
+class MailingStreet(_BaseModel, table=True):
     streetid: int = Field(primary_key=True)
     name: str
     citystatezip_cszipid: int = Field(foreign_key="mailingcitystatezip.id")
     pobox: Optional[bool]
 
 
-class MailingCityStateZip(_TableWithMetaData, table=True):
+class MailingCityStateZip(_BaseModel, table=True):
     id: int = Field(primary_key=True)
     zip_code: str
     state_abbr: str
     city: str
 
 
-class HumanMailingAddress(_TableWithMetaData, table=True):
-    humanmailing_humanid: int = Field(primary_key=True, foreign_key="human.humanid")
-    humanmailing_addressid: int = Field(primary_key=True, foreign_key="mailingaddress.addressid")
-
-
-class Human(_TableWithMetaData, table=True):
+class Human(_BaseModel, table=True):
     humanid: int = Field(primary_key=True)
     name: str
     businessentity: bool
     multihuman: Optional[bool]
+
+
+###
+# Link tables
+
+
+class _LinkModel(_BaseModel):
+    linkid: int = Field(primary_key=True)
+    linkedobjectrole_lorid: int = Field(foreign_key="linkedobjectrole.lorid")
+
+
+class ParcelMailingAddress(_LinkModel, table=True):
+    parcel_parcelkey: int = Field(foreign_key="parcel.parcelkey")
+    mailingaddress_addressid: int = Field(foreign_key="mailingAddress.addressid")
+
+
+class HumanMailingAddress(_LinkModel, table=True):
+    humanmailing_humanid: int = Field(foreign_key="human.humanid")
+    humanmailing_addressid: int = Field(foreign_key="mailingaddress.addressid")
+
+
+class HumanParcel(_LinkModel, table=True):
+    human_humanid: int = Field(foreign_key="human.humanid")
+    parcel_parcelkey: int = Field(foreign_key="parcel.parcelkey")

@@ -32,7 +32,7 @@ def address(db, *, street_id, number, attn, secondary) -> orm.MailingAddress:
     return _select_or_insert(
         db,
         select._address,
-        insert.mailing_address,
+        insert.address,
         street_id=street_id,
         number=number,
         attn=attn,
@@ -40,5 +40,5 @@ def address(db, *, street_id, number, attn, secondary) -> orm.MailingAddress:
     )
 
 
-# def parcel(db, *, parcel_id, municipality: str) -> orm.Parcel:
-#     return _select_or_insert(db, select.parcel, insert.parcel_mailing)
+def human(db, *, name, is_multi_entity) -> orm.Human:
+    return _select_or_insert(db, select._human, insert.human, name=name, is_multi_entity=is_multi_entity)

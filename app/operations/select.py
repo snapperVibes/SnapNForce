@@ -4,7 +4,7 @@ from typing import Optional
 from sqlmodel import select
 
 from app import orm
-from app.operations._common import GENERAL_LINKED_OBJECT_ROLE, MORTGAGE_LINKED_OBJECT_ROLE
+from app.constants import LinkedObjectRole
 
 # TODO: Figure out good naming pattern.
 #  I don't have one right now, so I've just made stuff "private"
@@ -20,10 +20,6 @@ def parcel(session, county_parcel_id: str) -> orm.Parcel:
 def parcel_mailing_addresses(session, parcel_key) -> list[orm.ParcelMailingAddress]:
     statement = select(orm.ParcelMailingAddress).where(
         orm.ParcelMailingAddress.parcel_parcelkey == parcel_key,
-        (
-            (orm.ParcelMailingAddress.linkedobjectrole_lorid == GENERAL_LINKED_OBJECT_ROLE)
-            | (orm.ParcelMailingAddress.linkedobjectrole_lorid == MORTGAGE_LINKED_OBJECT_ROLE)
-        ),
         orm.ParcelMailingAddress.deactivatedts == None,
     )
     return session.execute(statement).all()
@@ -121,4 +117,4 @@ def _human(session, *, name: str, is_multi_entity: bool) -> orm.Human:
         orm.Human.multihuman == is_multi_entity,
         orm.Human.deactivatedts == None,
     )
-    return session.execute(statement).scalar_one_or_none()
+    return session.execute(statement).scalar_one()

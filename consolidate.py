@@ -45,12 +45,10 @@ def consolidate_mailing_addresses(conn: Connection):
 
 def consolidate_parcels(conn: Connection):
     DUPLICATED_PARCELS = text(
-        "SELECT parcelidcnty, dups.keys FROM ("
-        "  SELECT parcelidcnty, array_agg(parcelkey) AS keys"
+        "SELECT parcelidcnty, array_agg(parcelkey) AS keys"
         "  FROM parcel AS p"
         "  GROUP BY parcelidcnty, deactivatedts"
         "  HAVING count(*) > 1 AND deactivatedts IS null"
-        ") as dups"
     )
     dups = conn.execute(DUPLICATED_PARCELS).all()
 

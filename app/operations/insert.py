@@ -7,7 +7,7 @@ from sqlalchemy.sql import func
 from sqlmodel import insert
 
 from app import orm
-from app.operations._common import USER_ID
+from app.constants import USER_ID
 
 _common = {
     "createdts": func.now(),
@@ -70,7 +70,7 @@ def street(session, *, street_name, city_state_zip_id, is_pobox) -> orm.MailingS
 
 
 @_insert_event("mailing address", requires_code_officer_approval=False)
-def mailing_address(
+def address(
     session, *, street_id: int, number: str, attn: Optional[str], secondary: Optional[str]
 ) -> orm.MailingAddress:
     statement = (
