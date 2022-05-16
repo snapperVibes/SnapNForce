@@ -13,5 +13,4 @@ INSERT INTO public.linkedobjectrole (lorid, lorschema, title, description, creat
 
   (236, 'ParcelHuman', 'Tax Bill Mailing Addressee', 'The name listed above the Tax Bill Mailing Address', now(), NULL, NULL),
 	(237, 'ParcelHuman', 'Owner Name', 'The name listed as "Owner Name:" in the upper right of the county profile page', now(), NULL, NULL);
-ROLLBACK;
 COMMIT;
