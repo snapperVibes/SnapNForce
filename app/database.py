@@ -41,5 +41,5 @@ def get_db():
 @contextmanager
 def get_db_context():
     # For use outside of FastAPI
-    with _engine.connect() as conn:
+    with _engine.connect().execution_options(autocommit=False) as conn:
         yield conn
