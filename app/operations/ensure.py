@@ -41,4 +41,6 @@ def address(db, *, street_id, number, attn, secondary) -> orm.MailingAddress:
 
 
 def human(db, *, name, is_multi_entity) -> orm.Human:
-    return _select_or_insert(db, select._human, insert.human, name=name, is_multi_entity=is_multi_entity)
+    return _select_or_insert(
+        db, select._human, insert.human, name=name, is_multi_entity=is_multi_entity
+    )
