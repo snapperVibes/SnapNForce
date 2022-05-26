@@ -24,7 +24,7 @@ except pgpasslib.PgPassException as err:
     _db_password = "changeme"
 
 _engine_params = f"postgresql+psycopg2://{_db_user}:{_db_password}@{_host}:{_port}/{_db_name}"
-_engine: Engine = create_engine(_engine_params, echo=False)
+_engine: Engine = create_engine(_engine_params, echo=True)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=_engine)
 metadata = MetaData()
 Base = declarative_base()
