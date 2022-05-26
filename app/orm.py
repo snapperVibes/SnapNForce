@@ -6,17 +6,18 @@ from sqlmodel import SQLModel, Field
 
 class _BaseModel(SQLModel):
     createdts: Optional[DateTime]
-    createdby_userid: Optional[int] = Field(foreign_key="login.userid")
+    createdby_userid: Optional[int] = Field(default=None, foreign_key="login.userid")
     lastupdatedts: Optional[DateTime]
-    lastupdatedby_userid: Optional[int] = Field(foreign_key="login.userid")
+    lastupdatedby_userid: Optional[int] = Field(default=None, foreign_key="login.userid")
     deactivatedts: Optional[DateTime] = None
-    deactivatedby_userid: Optional[int] = Field(foreign_key="login.userid")
+    deactivatedby_userid: Optional[int] = Field(default=None, foreign_key="login.userid")
 
 
 class Parcel(_BaseModel, table=True):
-    parcelkey: int = Field(primary_key=True)
+    parcelkey: int = Field(default=None, primary_key=True)
     parcelidcnty: str
     deactivatedts: Optional[DateTime] = None
+    muni_municode: int = Field(default=None, foreign_key="municipality.municode")
 
     @property
     def url(self):
@@ -26,9 +27,9 @@ class Parcel(_BaseModel, table=True):
 
 
 class MailingAddress(_BaseModel, table=True):
-    addressid: int = Field(primary_key=True)
+    addressid: int = Field(default=None, primary_key=True)
     bldgno: Optional[str]
-    street_streetid: int = Field(foreign_key="mailingstreet.streetid")
+    street_streetid: int = Field(default=None, foreign_key="mailingstreet.streetid")
     attention: Optional[str]
     secondary: Optional[str]
 
@@ -36,22 +37,27 @@ class MailingAddress(_BaseModel, table=True):
 class MailingStreet(_BaseModel, table=True):
     streetid: int = Field(primary_key=True)
     name: str
-    citystatezip_cszipid: int = Field(foreign_key="mailingcitystatezip.id")
+    citystatezip_cszipid: int = Field(default=None, foreign_key="mailingcitystatezip.id")
     pobox: Optional[bool]
 
 
 class MailingCityStateZip(_BaseModel, table=True):
-    id: int = Field(primary_key=True)
+    id: int = Field(default=None, primary_key=True)
     zip_code: str
     state_abbr: str
     city: str
 
 
 class Human(_BaseModel, table=True):
-    humanid: int = Field(primary_key=True)
+    humanid: int = Field(default=None, primary_key=True)
     name: str
     businessentity: bool
     multihuman: Optional[bool]
+
+
+class Municipality(SQLModel, table=True):
+    municode: int = Field(default=None, primary_key=True)
+    muniname: str
 
 
 ###
@@ -76,3 +82,4 @@ class HumanMailingAddress(_LinkModel, table=True):
 class HumanParcel(_LinkModel, table=True):
     human_humanid: int = Field(foreign_key="human.humanid")
     parcel_parcelkey: int = Field(foreign_key="parcel.parcelkey")
+
