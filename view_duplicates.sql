@@ -1,5 +1,6 @@
 -- Several tables contain multiple values that tuples that refer to the same real-world data.
 --  This file contains statements to make the issues easily viewable.
+--  Running `consolidate.py` fixes these issues.
 
 --
 -- MAIN TABLES

@@ -24,8 +24,6 @@ global_logger = structlog.get_logger()
 global_logger.format = "%(message)s"
 
 
-
-
 def consolidate_mailing_addresses(conn: Connection, logger, municode):
     for address_ids, _building_number, _street_id, _attention, _secondary, _parcelkey in select_duplicate_address_ids(conn, municode):
         logger.msg("Consolidating mailing addresses", building_number=_building_number, street_id=_street_id, attention=_attention, secondary=_secondary, address_ids=address_ids, parcelkey=_parcelkey)
@@ -40,7 +38,6 @@ def consolidate_mailing_addresses(conn: Connection, logger, municode):
             deactivate_addressid(conn, addressid, log=log)
             for func in update_functions:
                 func(conn, old=addressid, new=truth, log=log)
-
 
 
 def consolidate_parcels(conn: Connection, logger, municode):
@@ -90,20 +87,21 @@ def deactivate_duplicate_human_parcels(conn: Connection, logger, municode):
 
 
 def deactivate_duplicate_parcel_units(conn: Connection, logger, municode):
-    for unitids, _unnitnumber, _parcelkey,  in select_duplicate_parcel_units(conn, municode):
-        logger.info("Consolidating parcel units", unitnumber=_unnitnumber, parcelkey=_parcelkey)
-        truth = unitids[0]
-        dups = unitids[1:]
-        logger.info("Choose parcelunit as source of truth", truth=truth, dups=dups)
-        deactivate_funcs = [deactivate_parcelunit_by_unit_id]
-        for unitid in dups:
-            log = logger.bind(unitid=unitid)
-            for func in deactivate_funcs:
-                func(conn, old=unitid, log=log)
+    try:
+        for unitids, _unnitnumber, _parcelkey,  in select_duplicate_parcel_units(conn, municode):
+            logger.info("Consolidating parcel units", unitnumber=_unnitnumber, parcelkey=_parcelkey)
+            truth = unitids[0]
+            dups = unitids[1:]
+            logger.info("Choose parcelunit as source of truth", truth=truth, dups=dups)
+            deactivate_funcs = [deactivate_parcelunit_by_unit_id]
+            for unitid in dups:
+                log = logger.bind(unitid=unitid)
+                for func in deactivate_funcs:
+                    func(conn, old=unitid, log=log)
+    except ValueError:
+        breakpoint()
 
 
-
-# @log_return("Selected duplicate address ids: {}")
 def select_duplicate_address_ids(conn: Connection, municode):
     statement = text(
         """
@@ -202,7 +200,7 @@ WITH dups AS (
     HAVING count(*) > 1
        AND deactivatedts IS null
 )
-    SELECT * FROM dups JOIN parcel p on dups.parcel_parcelkey=p.parcelkey WHERE p.muni_municode=999
+    SELECT linkids, human_humanid, parcel_parcelkey FROM dups join parcel p on dups.parcel_parcelkey=p.parcelkey where p.muni_municode=:municode
     """
     ).params({"municode": municode})
     return conn.execute(statement).all()
@@ -226,7 +224,7 @@ WITH dups AS (
     FROM parcelunit
     GROUP BY unitnumber, parcel_parcelkey, deactivatedts
     HAVING count(*) > 1 AND deactivatedts IS null
-) SELECT * FROM dups JOIN parcel p on dups.parcel_parcelkey=p.parcelkey WHERE p.muni_municode=999;
+) SELECT dups.unitids, unitnumber, parcel_parcelkey FROM dups JOIN parcel p on dups.parcel_parcelkey=p.parcelkey WHERE p.muni_municode=:municode;
             """
     ).params({"municode": municode})
     return  conn.execute(statement).all()
@@ -304,8 +302,6 @@ def update_parcel_info(conn, old, new, log):
 
 
 
-
-
 def update_parcelphotodoc(conn, old, new, log):
     statement = text(
         "UPDATE parcelphotodoc SET parcel_parcelkey=:new WHERE parcel_parcelkey=:old"
@@ -316,8 +312,6 @@ def update_parcelphotodoc(conn, old, new, log):
         log.info("Updated parcelphotodoc")
     else:
         log.info("Updated parcelphotodoc. No parcelphotodoc with given parcelkey found.")
-
-
 
 
 def update_parcelunit_by_parcel_key(conn, old, new, log):
@@ -340,7 +334,6 @@ def deactivate_parcelunit_by_unit_id(conn, old, log):
     log.info("Deactivated parcel unit -------")
 
 
-
 def update_human_parcel_by_parcel(conn, old, new, log):
     statement = text(
         "UPDATE humanparcel SET parcel_parcelkey=:new, lastupdatedby_userid=:user_id, lastupdatedts=now() WHERE parcel_parcelkey=:old"
@@ -357,13 +350,6 @@ def deactivate_human_parcel_by_linkid(conn, old, log):
     ).params({"old": old, "user_id": USER_ID})
     conn.execute(statement)
     log.info("Deactivated human parcel -----")
-
-# def update_parcel_unit(conn, unitid, log):
-#     statement = text(
-#         "UPDATE parcelunit SET deactivatedts=now(), deactivatedby_userid=:user_id WHERE unitid=:unitid"
-#     ).params({"unitid": unitid, "user_id": USER_ID})
-#     conn.execute(statement)
-#     log.info("Deactivated parcelunit -------")
 
 
 def create_unique_indexes(conn):
@@ -389,7 +375,6 @@ def create_unique_indexes(conn):
                 ON humanparcel (human_humanid, parcel_parcelkey, source_sourceid, linkedobjectrole_lorid)
                 WHERE (deactivatedts is null);
             
-            
             CREATE UNIQUE INDEX IF NOT EXISTS parcelunit_unique_where_not_null
                 on parcelunit (unitnumber, parcel_parcelkey)
                 WHERE (deactivatedts is null);
@@ -399,11 +384,21 @@ def create_unique_indexes(conn):
 
 
 def get_munis(conn: Connection):
-    statement = text(
-        "SELECT municode, muniname FROM municipality;"
-    )
+    statement = text("SELECT municode, muniname FROM municipality;")
     return conn.execute(statement).all()
 
+
+def main(conn, id):
+    with get_db_context() as conn:
+        for municode, muniname in itertools.chain(get_munis(conn), [(None, "All Municipalities")]):
+            log = global_logger.bind(muni=muniname)
+
+            consolidate_mailing_addresses(conn, log, municode=municode)
+            consolidate_parcels(conn, log, municode=municode)
+
+            deactivate_duplicate_parcel_mailing_addresses(conn, log, municode=municode)
+            deactivate_duplicate_human_parcels(conn, log, municode=municode)
+            deactivate_duplicate_parcel_units(conn, log, municode=municode)
 
 
 if __name__ == "__main__":
@@ -418,8 +413,6 @@ if __name__ == "__main__":
             deactivate_duplicate_parcel_mailing_addresses(conn, log, municode=municode)
             deactivate_duplicate_human_parcels(conn, log, municode=municode)
             deactivate_duplicate_parcel_units(conn, log, municode=municode)
-
-
 
         create_unique_indexes(conn)
         # conn.commit()
