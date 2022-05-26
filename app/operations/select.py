@@ -1,10 +1,10 @@
 # Todo: Consolidate duplicated code using functional programming techniques
 from typing import Optional
 
-from sqlmodel import select
+from sqlmodel import Session, select
 
 from app import orm
-from app.constants import LinkedObjectRole
+
 
 # TODO: Figure out good naming pattern.
 #  I don't have one right now, so I've just made stuff "private"
@@ -118,3 +118,9 @@ def _human(session, *, name: str, is_multi_entity: bool) -> orm.Human:
         orm.Human.deactivatedts == None,
     )
     return session.execute(statement).scalar_one()
+
+def parcels_by_municode(session: Session, *, municode):
+    statement = select(orm.Parcel).where(
+        orm.Parcel.muni_municode == municode
+    )
+    return session.execute(statement).scalars()
