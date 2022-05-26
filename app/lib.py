@@ -2,13 +2,14 @@
 # fmt: off
 import re
 from functools import partial
-from typing import Optional, Literal
+from typing import Optional
 
 from bs4 import NavigableString, Tag
 from sqlalchemy.exc import NoResultFound
 from sqlmodel import Session
+from sqlmodel.engine.result import ScalarResult
 
-from app import schemas
+from app import schemas, orm
 from app.constants import LinkedObjectRole
 from app.operations import ensure, deactivate, link
 from app.operations import select
@@ -146,6 +147,10 @@ def _cog_tables_to_owner_and_mailing(t: schemas.CogTables) -> schemas.OwnerAndMa
     )
 
 
+
+
+
+
 async def get_parcel_data_from_county(parcel_id: str) -> schemas.GeneralAndMortgage:
     general_data = await get_general_data_from_county(parcel_id)
     tax_data = await get_tax_data_from_county(parcel_id)
@@ -266,3 +271,7 @@ def _match_number(num_to_match: int, owners_and_mailings: list[schemas.CogTables
 
 _match_general = partial(_match_number, LinkedObjectRole.GENERAL_HUMAN_MAILING_ADDRESS)
 _match_mortgage = partial(_match_number, LinkedObjectRole.MORTGAGE_HUMAN_MAILING_ADDRESS)
+
+
+def select_all_parcels_in_municode(db: Session, *, municode: int):
+    return select.parcels_by_municode(db, municode=municode)
