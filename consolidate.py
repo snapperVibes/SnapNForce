@@ -18,7 +18,7 @@ logging.basicConfig(level=logging.DEBUG, filename=os.path.join("log", "consolida
 
 structlog.configure(logger_factory=LoggerFactory())
 global_logger = structlog.get_logger()
-global_logger.format = "%(message)s"
+global_logger.format = "%(asctime)s\t%(name)s:%(levelname)s\t%(message)s"
 
 
 def consolidate_mailing_addresses(conn: Connection, logger, municode):
