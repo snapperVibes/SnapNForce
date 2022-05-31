@@ -14,10 +14,7 @@ from structlog.stdlib import LoggerFactory
 from app.constants import USER_ID
 from app.database import get_db_context
 
-logging.basicConfig(
-    level=logging.DEBUG,
-    filename=os.path.join("log", "consolidate.log")
-)
+logging.basicConfig(level=logging.DEBUG, filename=os.path.join("log", "consolidate.log"))
 
 structlog.configure(logger_factory=LoggerFactory())
 global_logger = structlog.get_logger()
@@ -25,14 +22,27 @@ global_logger.format = "%(message)s"
 
 
 def consolidate_mailing_addresses(conn: Connection, logger, municode):
-    for address_ids, _building_number, _street_id, _attention, _secondary, _parcelkey in select_duplicate_address_ids(conn, municode):
-        logger.msg("Consolidating mailing addresses", building_number=_building_number, street_id=_street_id, attention=_attention, secondary=_secondary, address_ids=address_ids, parcelkey=_parcelkey)
+    for (
+        address_ids,
+        _building_number,
+        _street_id,
+        _attention,
+        _secondary,
+        _parcelkey,
+    ) in select_duplicate_address_ids(conn, municode):
+        logger.msg(
+            "Consolidating mailing addresses",
+            building_number=_building_number,
+            street_id=_street_id,
+            attention=_attention,
+            secondary=_secondary,
+            address_ids=address_ids,
+            parcelkey=_parcelkey,
+        )
         truth = address_ids[0]
         dups = address_ids[1:]
         logger.debug("Choose address_id as a source of truth", truth=truth, dups=address_ids)
-        update_functions = [
-            update_human_mailing_address, update_parcelmailingaddress_by_address
-        ]
+        update_functions = [update_human_mailing_address, update_parcelmailingaddress_by_address]
         for addressid in dups:
             log = logger.bind(address_id=addressid, truth=truth)
             deactivate_addressid(conn, addressid, log=log)
@@ -61,8 +71,28 @@ def consolidate_parcels(conn: Connection, logger, municode):
 
 
 def deactivate_duplicate_parcel_mailing_addresses(conn: Connection, logger, municode):
-    for linkids, _parcelkey, _mailingaddress_addressid, _linked_object_role,  _bldgno, _street_id, _attn, _secondary, _parcelid_county in select_duplicate_parcel_mailing_addresses(conn, municode):
-        logger.msg("Consolidating parcelmailingaddress", parcelkey=_parcelkey, addressid=_mailingaddress_addressid, linked_object_role=_linked_object_role, bldgno=_bldgno, street=_street_id, attn=_attn, secondary=_secondary, parcelid_county=_parcelid_county)
+    for (
+        linkids,
+        _parcelkey,
+        _mailingaddress_addressid,
+        _linked_object_role,
+        _bldgno,
+        _street_id,
+        _attn,
+        _secondary,
+        _parcelid_county,
+    ) in select_duplicate_parcel_mailing_addresses(conn, municode):
+        logger.msg(
+            "Consolidating parcelmailingaddress",
+            parcelkey=_parcelkey,
+            addressid=_mailingaddress_addressid,
+            linked_object_role=_linked_object_role,
+            bldgno=_bldgno,
+            street=_street_id,
+            attn=_attn,
+            secondary=_secondary,
+            parcelid_county=_parcelid_county,
+        )
         truth = linkids[0]
         dups: list[int] = linkids[1:]
         logger.debug("Choose parcelmailingaddress as a source of truth", truth=truth, dups=dups)
@@ -74,7 +104,11 @@ def deactivate_duplicate_parcel_mailing_addresses(conn: Connection, logger, muni
 
 
 def deactivate_duplicate_human_parcels(conn: Connection, logger, municode):
-    for linkids, _humanid, _parcelkey, in select_duplicate_human_parcels(conn, municode):
+    for (
+        linkids,
+        _humanid,
+        _parcelkey,
+    ) in select_duplicate_human_parcels(conn, municode):
         logger.info("Consolidating humanparcels", humanid=_humanid, parcelkey=_parcelkey)
         truth = linkids[0]
         dups = linkids[1:]
@@ -88,8 +122,14 @@ def deactivate_duplicate_human_parcels(conn: Connection, logger, municode):
 
 def deactivate_duplicate_parcel_units(conn: Connection, logger, municode):
     try:
-        for unitids, _unnitnumber, _parcelkey,  in select_duplicate_parcel_units(conn, municode):
-            logger.info("Consolidating parcel units", unitnumber=_unnitnumber, parcelkey=_parcelkey)
+        for (
+            unitids,
+            _unnitnumber,
+            _parcelkey,
+        ) in select_duplicate_parcel_units(conn, municode):
+            logger.info(
+                "Consolidating parcel units", unitnumber=_unnitnumber, parcelkey=_parcelkey
+            )
             truth = unitids[0]
             dups = unitids[1:]
             logger.info("Choose parcelunit as source of truth", truth=truth, dups=dups)
@@ -154,7 +194,7 @@ def select_duplicate_parcel_keys(conn, municode):
 
 def select_duplicate_parcel_mailing_addresses(conn, municode):
     statement = text(
-            """
+        """
             WITH dups AS (
               SELECT array_agg(linkid) linkids, parcel_parcelkey, mailingaddress_addressid, linkedobjectrole_lorid FROM parcelmailingaddress pma
                 GROUP BY parcel_parcelkey, mailingaddress_addressid, linkedobjectrole_lorid, pma.deactivatedts
@@ -177,7 +217,7 @@ def select_duplicate_parcel_mailing_addresses(conn, municode):
                 JOIN mailingaddress ma on dups.mailingaddress_addressid=ma.addressid
                 WHERE p.muni_municode=:municode;
             """
-    ).params({"municode": municode})
+        ).params({"municode": municode})
     return conn.execute(statement).all()
 
 
@@ -202,7 +242,7 @@ WITH dups AS (
 )
     SELECT linkids, human_humanid, parcel_parcelkey FROM dups join parcel p on dups.parcel_parcelkey=p.parcelkey where p.muni_municode=:municode
     """
-    ).params({"municode": municode})
+        ).params({"municode": municode})
     return conn.execute(statement).all()
 
 
@@ -226,8 +266,8 @@ WITH dups AS (
     HAVING count(*) > 1 AND deactivatedts IS null
 ) SELECT dups.unitids, unitnumber, parcel_parcelkey FROM dups JOIN parcel p on dups.parcel_parcelkey=p.parcelkey WHERE p.muni_municode=:municode;
             """
-    ).params({"municode": municode})
-    return  conn.execute(statement).all()
+        ).params({"municode": municode})
+    return conn.execute(statement).all()
 
 
 def deactivate_addressid(conn, addressid, log):
@@ -241,9 +281,9 @@ def deactivate_addressid(conn, addressid, log):
 
 
 def deactivate_parcel(conn, parcelkey):
-    statement = text("UPDATE parcel set deactivatedts=now(), deactivatedby_userid=:user_id WHERE parcelkey=:parcelkey").params(
-        {"parcelkey": parcelkey, "user_id": USER_ID}
-    )
+    statement = text(
+        "UPDATE parcel set deactivatedts=now(), deactivatedby_userid=:user_id WHERE parcelkey=:parcelkey"
+    ).params({"parcelkey": parcelkey, "user_id": USER_ID})
     conn.execute(statement)
 
 
@@ -256,7 +296,10 @@ def update_human_mailing_address(conn, old, new, log):
     if linkids:
         log.info("Updated humanmailingaddress", linkids=linkids)
     else:
-        log.info("Updated humanmailingaddress. There were no humanmailingaddresses with the given addressid")
+        log.info(
+            "Updated humanmailingaddress. There were no humanmailingaddresses with the given addressid"
+        )
+
 
 def update_parcelmailingaddress_by_address(conn, old, new, log):
     statement = text(
@@ -267,7 +310,9 @@ def update_parcelmailingaddress_by_address(conn, old, new, log):
     if address_id:
         log.info("Updated parcelmailingaddress", address_id=address_id)
     else:
-        log.info("Updated parcelmailingaddress. There were no parcelmailingaddresses with the given addressid")
+        log.info(
+            "Updated parcelmailingaddress. There were no parcelmailingaddresses with the given addressid"
+        )
 
 
 def update_parcelmailingaddress_by_parcel(conn, old, new, log):
@@ -279,7 +324,9 @@ def update_parcelmailingaddress_by_parcel(conn, old, new, log):
     if parcelkey:
         log.info("Updated parcelmailingaddress", parcelkey=parcelkey)
     else:
-        log.info("Updated parcelmailingaddress. There were no parcelmailingaddresses with the given addressid")
+        log.info(
+            "Updated parcelmailingaddress. There were no parcelmailingaddresses with the given addressid"
+        )
 
 
 def deactivate_parcelmailingaddress_by_link_id(conn, old, log):
@@ -288,6 +335,7 @@ def deactivate_parcelmailingaddress_by_link_id(conn, old, log):
     ).params({"user_id": USER_ID, "old": old})
     conn.execute(statement)
     log.info("Deactivated parcelmailingaddress -------")
+
 
 def update_parcel_info(conn, old, new, log):
     statement = text(
@@ -299,7 +347,6 @@ def update_parcel_info(conn, old, new, log):
         log.info("Updated parcelinfo", parcelinfoid=parcelinfoid)
     else:
         log.info("Updated parcelinfo. There were no parcelinfos with the given parcelkey")
-
 
 
 def update_parcelphotodoc(conn, old, new, log):

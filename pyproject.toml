@@ -9,7 +9,9 @@ python = "^3.10"
 fastapi = "^0.75.1"
 uvicorn = "^0.17.6"
 lark = "^1.1.2"
-SQLAlchemy = "^1.4.35"
+# SQLAlchemy 1.4.36 breaks SQLModel Relationships
+# https://github.com/tiangolo/sqlmodel/issues/315
+SQLAlchemy = "1.4.35"
 httpx = "^0.22.0"
 beautifulsoup4 = "^4.11.1"
 psycopg2-binary = "^2.9.3"

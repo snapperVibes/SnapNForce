@@ -14,7 +14,7 @@ def parcel(session, county_parcel_id: str) -> orm.Parcel:
     statement = select(orm.Parcel).where(
         orm.Parcel.parcelidcnty == county_parcel_id, orm.Parcel.deactivatedts == None
     )
-    return session.execute(statement).scalar_one()
+    return session.exec(statement).one()
 
 
 def parcel_mailing_addresses(session, parcel_key) -> list[orm.ParcelMailingAddress]:
@@ -119,8 +119,7 @@ def _human(session, *, name: str, is_multi_entity: bool) -> orm.Human:
     )
     return session.execute(statement).scalar_one()
 
+
 def parcels_by_municode(session: Session, *, municode):
-    statement = select(orm.Parcel).where(
-        orm.Parcel.muni_municode == municode
-    )
+    statement = select(orm.Parcel).where(orm.Parcel.muni_municode == municode)
     return session.execute(statement).scalars()

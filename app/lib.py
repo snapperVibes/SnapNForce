@@ -4,6 +4,8 @@ import re
 from functools import partial
 from typing import Optional
 
+
+import sqlmodel
 from bs4 import NavigableString, Tag
 from sqlalchemy.exc import NoResultFound
 from sqlmodel import Session
@@ -19,104 +21,171 @@ from lib import scrape, parse
 
 async def sync_parcel_data(db: Session, parcel_id: str) -> schemas.GeneralAndMortgage:
     _county_data = await get_parcel_data_from_county(parcel_id)
-    _cog_tables = get_cog_tables(db, parcel_id)
 
-    out = {
-        "general": None,
-        "tax": None
-    }
-    for county, cog, address_and_human_roles in zip(
-        (_county_data.general, _county_data.mortgage),
-        (_cog_tables.general, _cog_tables.mortgage),
-        (LinkedObjectRole.general_roles, LinkedObjectRole.mortgage_roles),
-    ):
-        out[address_and_human_roles] = _sync_owner_and_mailing(db, county, cog, address_and_human_roles)
-    return schemas.GeneralAndMortgage(
-        general=out[LinkedObjectRole.general_roles],
-        mortgage=out[LinkedObjectRole.mortgage_roles]
-    )
+    # Temp alias
+    d = _county_data  # data
+    p = orm.Parcel()
+    p.parcelidcnty=parcel_id
+    # p.muni_municode = None
 
 
-def _sync_owner_and_mailing(
-        db,
-        county_data: schemas.OwnerAndMailing,
-        cog_tables: Optional[schemas.CogTables],
-        address_and_human_roles: tuple[int, int]
-) -> schemas.OwnerAndMailing:
-    address_role, addressee_role = address_and_human_roles
-    cog_data = _cog_tables_to_owner_and_mailing(cog_tables)
+    ma = orm.MailingAddress()
+    ma.bldgno
+    ma.secondary
+    ma.attention
 
-    # Todo: ensure parcel here
-    #  Note: make sure to change references to cog_tables.parcel.parcelkey
-    #  to the yet-to-be-created parcel_table.parcelkey
+    s = orm.MailingStreet()
+    s.name
+    s.pobox
 
-    # Todo: I don't like how this can be reassigned by the following if clause.
-    #  Make it pretty and clean.
-    address_id = cog_tables and cog_tables.address and cog_tables.address.addressid
-    returned_address = county_data.mailing
-    same_address = county_data.mailing == cog_data.mailing
-    if not same_address:
-        if not cog_tables is None:
-            # Deactivate address and linked tables
-            # TODO: Automatic database cascade
-            if cog_tables.parcel_address:
-                deactivate.parcel_to_address(db, id=cog_tables.parcel_address.linkid)
-            if cog_tables.human_address:
-                deactivate.human_to_address(db, id=cog_tables.human_address.linkid)
-            if cog_tables.address:
-                deactivate.address(db, id=cog_tables.address.addressid)
+    csz = orm.MailingCityStateZip()
+    csz.zip_code
+    csz.state_abbr
+    csz.city
 
-        # Insert new data
-        city_state_zip_table = ensure.city_state_zip(db, city=county_data.mailing.last.city, state=county_data.mailing.last.state, zip_=county_data.mailing.last.zip)
-        street_table = ensure.street(db, city_state_zip_id=city_state_zip_table.id, street_name=county_data.mailing.delivery.street, is_pobox=county_data.mailing.delivery.is_pobox)
-        address_table = ensure.address(db, street_id=street_table.streetid, number=county_data.mailing.delivery.number,  attn=county_data.mailing.delivery.attn, secondary=county_data.mailing.delivery.secondary)
-        # Hmm, should linking go here? Or is it a separate step?
-        link.parcel_to_address(db, parcelkey=cog_tables.parcel.parcelkey, address_id=address_table.addressid, role=address_role)
-        address_id = address_table.addressid
-        returned_address = schemas.Mailing(
-            delivery=schemas.DeliveryAddressLine(
-                is_pobox=street_table.pobox,
-                attn=address_table.attention,
-                number=address_table.bldgno,
-                street=street_table.name,
-                secondary=address_table.secondary,
-            ),
-            last=schemas.LastLine(
-                city=city_state_zip_table.city,
-                state=city_state_zip_table.state_abbr,
-                zip=city_state_zip_table.zip_code
-            )
-        )
+    s.citystatezip = csz
+    ma.street = s
+    breakpoint()
 
-    human_id = cog_tables and cog_tables.human and cog_tables.human.humanid
-    returned_human = county_data.owner
-    same_human = county_data.owner == cog_data.owner
-    if not same_human:
-        if not cog_tables is None:
-            if cog_tables.human_parcel:
-                deactivate.human_to_parcel(db, id=cog_tables.human_parcel)
-            # Todo: If we already deactivated human parcel, we may hit the database an unnecessary time here
-            #  At the time of writing, clean code matters more to me than efficiency.
-            #  I still would like to remove the unnecessary call
-            if cog_tables.human_address:
-                deactivate.human_to_address(db, id=cog_tables.human_address.linkid)
-            if cog_tables.human:
-                deactivate.human(db, id=cog_tables.human.humanid)
-        human_table = ensure.human(db, name=county_data.owner.name, is_multi_entity=county_data.owner.is_multi_entity)
-        link.human_to_parcel(db, parcelkey=cog_tables.parcel.parcelkey, humanid=human_table.humanid, role=addressee_role)
-        human_id = human_table.humanid
-        returned_human = schemas.Owner(
-            name=human_table.name,
-            is_multi_entity=human_table.multihuman
-        )
 
-    if (not same_human) or (not same_address):
-        link.human_to_address(db, human_id=human_id, address_id=address_id, role=addressee_role)
 
-    return schemas.OwnerAndMailing(
-        owner=returned_human,
-        mailing=returned_address
-    )
+
+    p.humans = None
+    county_data = scraped_to_tables(_county_data)
+
+
+    parcel = select.parcel(db, county_parcel_id=parcel_id)
+
+
+
+
+
+def scraped_to_tables(data: schemas.GeneralAndMortgage):
+
+    breakpoint()
+
+
+
+# async def sync_parcel_data(db: Session, parcel_id: str) -> schemas.GeneralAndMortgage:
+#     _county_data = await get_parcel_data_from_county(parcel_id)
+#     _cog_tables = get_cog_tables(db, parcel_id)
+#
+#     out = {"general": None, "tax": None}
+#     for county, cog, address_and_human_roles in zip(
+#         (_county_data.general, _county_data.mortgage),
+#         (_cog_tables.general, _cog_tables.mortgage),
+#         (LinkedObjectRole.general_roles, LinkedObjectRole.mortgage_roles),
+#     ):
+#         out[address_and_human_roles] = _sync_owner_and_mailing(db, county, cog, address_and_human_roles)
+#     return schemas.GeneralAndMortgage(
+#         general=out[LinkedObjectRole.general_roles],
+#         mortgage=out[LinkedObjectRole.mortgage_roles]
+#     )
+#
+#
+# def _sync_owner_and_mailing(
+#         db,
+#         county_data: schemas.OwnerAndMailing,
+#         cog_tables: Optional[schemas.CogTables],
+#         address_and_human_roles: tuple[int, int]
+# ) -> schemas.OwnerAndMailing:
+#     address_id = cog_tables and cog_tables.address and cog_tables.address.addressid
+
+
+
+# def _sync_owner_and_mailing(
+#         db,
+#         county_data: schemas.OwnerAndMailing,
+#         cog_tables: Optional[schemas.CogTables],
+#         address_and_human_roles: tuple[int, int]
+# ) -> schemas.OwnerAndMailing:
+#     address_role, addressee_role = address_and_human_roles
+#     cog_data = _cog_tables_to_owner_and_mailing(cog_tables)
+#
+#     # Todo: ensure parcel here
+#     #  Note: make sure to change references to cog_tables.parcel.parcelkey
+#     #  to the yet-to-be-created parcel_table.parcelkey
+#
+#     # Todo: I don't like how this can be reassigned by the following if clause.
+#     #  Make it pretty and clean.
+#     address_id = cog_tables and cog_tables.address and cog_tables.address.addressid
+#     returned_address = county_data.mailing
+#     same_address = county_data.mailing == cog_data.mailing
+#     if not same_address:
+#         if not cog_tables is None:
+#             # Deactivate address and linked tables
+#             # TODO: Automatic database cascade
+#             if cog_tables.parcel_address:
+#                 deactivate.parcel_to_address(db, id=cog_tables.parcel_address.linkid)
+#             if cog_tables.human_address:
+#                 deactivate.human_to_address(db, id=cog_tables.human_address.linkid)
+#             if cog_tables.address:
+#                 deactivate.address(db, id=cog_tables.address.addressid)
+#
+#         # Insert new data
+#         city_state_zip_table = ensure.city_state_zip(db, city=county_data.mailing.last.city, state=county_data.mailing.last.state, zip_=county_data.mailing.last.zip)
+#         street_table = ensure.street(db, city_state_zip_id=city_state_zip_table.id, street_name=county_data.mailing.delivery.street, is_pobox=county_data.mailing.delivery.is_pobox)
+#         address_table = ensure.address(db, street_id=street_table.streetid, number=county_data.mailing.delivery.number,  attn=county_data.mailing.delivery.attn, secondary=county_data.mailing.delivery.secondary)
+#         # Hmm, should linking go here? Or is it a separate step?
+#         link.parcel_to_address(db, parcelkey=cog_tables.parcel.parcelkey, address_id=address_table.addressid, role=address_role)
+#         address_id = address_table.addressid
+#         returned_address = schemas.Mailing(
+#             delivery=schemas.DeliveryAddressLine(
+#                 is_pobox=street_table.pobox,
+#                 attn=address_table.attention,
+#                 number=address_table.bldgno,
+#                 street=street_table.name,
+#                 secondary=address_table.secondary,
+#             ),
+#             last=schemas.LastLine(
+#                 city=city_state_zip_table.city,
+#                 state=city_state_zip_table.state_abbr,
+#                 zip=city_state_zip_table.zip_code
+#             )
+#         )
+#
+#     human_id = cog_tables and cog_tables.human and cog_tables.human.humanid
+#     human_parcel_linked_object_role = cog_tables and cog_tables.human_parcel and cog_tables.human_parcel.linkedobjectrole_lorid
+#     if human_parcel_linked_object_role and (human_parcel_linked_object_role != LinkedObjectRole.CURRENT_OWNER):
+#         deactivate.human_to_parcel(db, cog_tables.human_parcel.linkid)
+#         insert.human_to_parcel(db, )
+#
+#         orm.HumanParcel
+#
+#     returned_human = county_data.owner
+#     same_human = county_data.owner == cog_data.owner
+#     if not same_human:
+#         if not cog_tables is None:
+#             if cog_tables.human_parcel:
+#                 raise RuntimeError("Code is a work in progress. Fix")
+#                 # statement = sqlmodel.update(orm.HumanParcel).where(
+#                 #     orm.HumanParcel.linkid == cog_tables.human_parcel.linkid,
+#                 #     orm.HumanParcel.deactivatedts == None
+#                 # ).values(linkedobjectrole_lorid=USER_ID)
+#             # if cog_tables.human_parcel:
+#             #     deactivate.human_to_parcel(db, id=cog_tables.human_parcel)
+#             # # Todo: If we already deactivated human parcel, we may hit the database an unnecessary time here
+#             # #  At the time of writing, clean code matters more to me than efficiency.
+#             # #  I still would like to remove the unnecessary call
+#             # if cog_tables.human_address:
+#             #     deactivate.human_to_address(db, id=cog_tables.human_address.linkid)
+#             # if cog_tables.human:
+#             #     deactivate.human(db, id=cog_tables.human.humanid)
+#         human_table = ensure.human(db, name=county_data.owner.name, is_multi_entity=county_data.owner.is_multi_entity)
+#         link.human_to_parcel(db, parcelkey=cog_tables.parcel.parcelkey, humanid=human_table.humanid, role=addressee_role)
+#         human_id = human_table.humanid
+#         returned_human = schemas.Owner(
+#             name=human_table.name,
+#             is_multi_entity=human_table.multihuman
+#         )
+#
+#     if (not same_human) or (not same_address):
+#         link.human_to_address(db, human_id=human_id, address_id=address_id, role=addressee_role)
+#
+#     return schemas.OwnerAndMailing(
+#         owner=returned_human,
+#         mailing=returned_address
+#     )
 
 
 
@@ -230,11 +299,12 @@ def _clean_whitespace(text: str) -> str:
     return re.sub(r"\s+", " ", text)
 
 
-def get_cog_tables(db, parcel_id) -> CogGeneralAndMortgage:
+def get_cog_tables(db, parcel_id):
     all_addresses = []
     parcel = select.parcel(db, parcel_id)
     if parcel is None:
-        return schemas.CogGeneralAndMortgage(general=None, mortgage=None)
+        raise RuntimeError
+        # return schemas.CogGeneralAndMortgage(general=None, mortgage=None)
     parcel_addresses = select.parcel_mailing_addresses(db, parcel.parcelkey)
     for (parcel_address,) in parcel_addresses:
         address = select.address(db, parcel_address.mailingaddress_addressid)

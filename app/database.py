@@ -1,5 +1,5 @@
 import warnings
-from collections import namedtuple
+from sqlmodel import Session
 from contextlib import contextmanager
 
 from sqlalchemy import MetaData
@@ -25,21 +25,30 @@ except pgpasslib.PgPassException as err:
 
 _engine_params = f"postgresql+psycopg2://{_db_user}:{_db_password}@{_host}:{_port}/{_db_name}"
 _engine: Engine = create_engine(_engine_params, echo=True)
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=_engine)
+
+# SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=_engine)
 metadata = MetaData()
 Base = declarative_base()
 
 
 def get_db():
-    db = SessionLocal()
+    db = Session(_engine)
     try:
         yield db
     finally:
         db.close()
 
+    # db = SessionLocal()
+    # try:
+    #     yield db
+    # finally:
+    #     db.close()
+
 
 @contextmanager
 def get_db_context():
     # For use outside of FastAPI
-    with _engine.connect().execution_options(autocommit=False) as conn:
+    with Session(_engine) as conn:
         yield conn
+    # with _engine.connect().execution_options(autocommit=False) as conn:
+    #     yield conn

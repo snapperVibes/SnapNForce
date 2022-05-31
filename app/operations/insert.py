@@ -7,7 +7,7 @@ from sqlalchemy.sql import func
 from sqlmodel import insert
 
 from app import orm
-from app.constants import USER_ID
+from app.constants import USER_ID, SOURCE_ID
 
 _common = {
     "createdts": func.now(),
@@ -15,6 +15,8 @@ _common = {
     "lastupdatedts": func.now(),
     "lastupdatedby_userid": USER_ID,
 }
+
+_common_and_source = {"source_sourceid": SOURCE_ID, **_common}
 
 
 def _insert_event(name: str, requires_code_officer_approval: bool):
@@ -105,3 +107,8 @@ def human_mailing(session, *, human_id: int, mailing_id: int) -> orm.HumanMailin
         .returning(orm.HumanMailingAddress)
     )
     return session.execute(statement).one()
+
+
+@_insert_event("human parcel", requires_code_officer_approval=False)
+def human_to_parcel(session, *, human_id: int, parcel_id: int) -> orm.HumanParcel:
+    statement = insert(orm.HumanParcel).values(human_humanid=None, parcel_parcelkey=None)

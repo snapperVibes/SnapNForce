@@ -29,10 +29,7 @@ async def sync(id: str, db: Session = Depends(get_db)):
 
 @app.get("/municipality/sync", response_model=schemas.MunicipalitySyncData)
 async def sync_municipality(municode: int, db: Session = Depends(get_db)):
-    sync_data = schemas.MunicipalitySyncData(
-        total=0,
-        skipped=[]
-    )
+    sync_data = schemas.MunicipalitySyncData(total=0, skipped=[])
 
     for parcel in lib.select_all_parcels_in_municode(db, municode=municode):
         try:
@@ -48,4 +45,5 @@ async def sync_municipality(municode: int, db: Session = Depends(get_db)):
 @app.get("/temp/consolidate")
 def consolidate(municode: int):
     import app.temp.cons
+
     app.temp.cons.main(municode)

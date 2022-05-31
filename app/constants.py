@@ -11,6 +11,9 @@ class LinkedObjectRole:
     MORTGAGE_HUMAN = 236
     COUNTY_PROPERTY_ADDRESS = 235
 
+    CURRENT_OWNER = 116
+    FORMER_OWNER = 117
+
     @classmethod
     @property
     def general_roles(cls):
@@ -40,3 +43,4 @@ class LinkedObjectRole:
 
 
 USER_ID = 99  # the id of "sylvia". Todo: new user id
+SOURCE_ID = None  # Todo: new source id

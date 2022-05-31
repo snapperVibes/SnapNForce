@@ -5,6 +5,8 @@ from time import sleep
 from sqlalchemy import text
 from sqlalchemy.engine import Connection
 from sqlalchemy.exc import MultipleResultsFound
+
+from app import database
 from app.database import get_db_context, SessionLocal
 from app.lib import sync_parcel_data
 
@@ -25,7 +27,8 @@ SKIP_TO = 1
 async def main():
     with get_db_context() as conn:
         parcel_ids = get_parcel_ids(conn)
-    with SessionLocal() as db:
+    import sqlmodel
+    with sqlmodel.Session(database._engine) as db:
         for i, parcel_id in enumerate(parcel_ids):
             if i < SKIP_TO:
                 continue
