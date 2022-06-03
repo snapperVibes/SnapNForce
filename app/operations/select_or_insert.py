@@ -12,7 +12,9 @@ SelectFuncType = typing.Callable[[Session, ModelType], typing.Optional[ModelType
 InsertFuncType = typing.Callable[[Session, ModelType], ModelType]
 
 
-def _select_or_insert(db: Session, model: ModelType, select_func: SelectFuncType, insert_event=UnimplementedEvent) -> ModelType:
+def _select_or_insert(db: Session, model: typing.Optional[ModelType], select_func: SelectFuncType, insert_event=UnimplementedEvent) -> typing.Optional[ModelType]:
+    if model is None:
+        return None
     _model = select_func(db, model)
     if _model is None:
         db.add(model)

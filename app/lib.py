@@ -27,115 +27,124 @@ async def sync_parcel_data(db: Session, parcel_id: str) -> schemas.GeneralAndMor
     parcel = select.parcel(db, model_parcel)
     parcel = parcel if parcel is not None else insert.parcel(db, model_parcel)
 
+    data: schemas.OwnerAndMailing
     linked_object_roles: _AddressAndHumanRoles  # just a typehint because my editor couldn't figure out the correct type
     for data, linked_object_roles in zip(
         (_county_data.general, _county_data.mortgage),
         (LinkedObjectRole.general_roles, LinkedObjectRole.mortgage_roles)
     ):
-        model_city_state_zip = orm.MailingCityStateZip(
-            zip_code=data.mailing.last.zip,
-            state_abbr=data.mailing.last.state,
-            city=data.mailing.last.city
-        )
-        city_state_zip = select_or_insert.city_state_zip(db, model_city_state_zip)
+        if data.mailing:
+            model_city_state_zip = orm.MailingCityStateZip(
+                zip_code=data.mailing.last.zip,
+                state_abbr=data.mailing.last.state,
+                city=data.mailing.last.city
+            )
+            city_state_zip = select_or_insert.city_state_zip(db, model_city_state_zip)
 
-        model_street = orm.MailingStreet(
-            name=data.mailing.delivery.street,
-            pobox=data.mailing.delivery.is_pobox,
-            # relationships
-            citystatezip=city_state_zip
-        )
-        street = select_or_insert.street(db, model_street)
+            model_street = orm.MailingStreet(
+                name=data.mailing.delivery.street,
+                pobox=data.mailing.delivery.is_pobox,
+                # relationships
+                citystatezip=city_state_zip
+            )
+            street = select_or_insert.street(db, model_street)
 
-        model_address = orm.MailingAddress(
-            bldgno=data.mailing.delivery.number,
-            attention=data.mailing.delivery.attn,
-            secondary=data.mailing.delivery.secondary,
-            # relationships
-            street=street
-        )
-        address = select_or_insert.address(db, model_address)
+            model_address = orm.MailingAddress(
+                bldgno=data.mailing.delivery.number,
+                attention=data.mailing.delivery.attn,
+                secondary=data.mailing.delivery.secondary,
+                # relationships
+                street=street
+            )
+            address = select_or_insert.address(db, model_address)
+        else:
+            city_state_zip = street = address = None
 
-        model_human = orm.Human(
-            name=data.owner.name,
-            multihuman=data.owner.is_multi_entity,
-            # businessentity=None,
-        )
-        human = select_or_insert.human(db, model_human)
+        if data.owner:
+            model_human = orm.Human(
+                name=data.owner.name,
+                multihuman=data.owner.is_multi_entity,
+                # businessentity=None,
+            )
+            human = select_or_insert.human(db, model_human)
+        else:
+            human = None
 
         # Todo: Let's write some wet code and fix it latter
         # todo: remove unnecessary database calls
 
+        if address:
+            _select_existing_addresses_linked_to_parcel = sqlmodel.select(
+                orm.ParcelMailingAddress
+            ).where(
+                orm.ParcelMailingAddress.parcel_parcelkey == parcel.parcelkey,
+                orm.ParcelMailingAddress.linkedobjectrole_lorid == linked_object_roles.address,
+                orm.ParcelMailingAddress.mailingaddress_addressid != address.addressid,
+                orm.ParcelMailingAddress.deactivatedts == None
+            )
+            non_current_linked_parcels_and_addresses = db.exec(_select_existing_addresses_linked_to_parcel).all()
+            for _model_linked_parcel_and_address in non_current_linked_parcels_and_addresses:
+                deactivate.linking_model(db, _model_linked_parcel_and_address)
+            model_linked_parcel_and_address = orm.ParcelMailingAddress(
+                parcel=parcel, mailingaddress=address, linkedobjectrole_lorid=linked_object_roles.address
+            )
+            linked_parcel_and_address = select_or_insert.linked_parcel_and_address(db, model_linked_parcel_and_address)
 
-        _select_existing_addresses_linked_to_parcel = sqlmodel.select(
-            orm.ParcelMailingAddress
-        ).where(
-            orm.ParcelMailingAddress.parcel_parcelkey == parcel.parcelkey,
-            orm.ParcelMailingAddress.linkedobjectrole_lorid == linked_object_roles.address,
-            orm.ParcelMailingAddress.mailingaddress_addressid != address.addressid,
-            orm.ParcelMailingAddress.deactivatedts == None
-        )
-        non_current_linked_parcels_and_addresses = db.exec(_select_existing_addresses_linked_to_parcel).all()
-        for _model_linked_parcel_and_address in non_current_linked_parcels_and_addresses:
-            deactivate.linking_model(db, _model_linked_parcel_and_address)
-        model_linked_parcel_and_address = orm.ParcelMailingAddress(
-            parcel=parcel, mailingaddress=address, linkedobjectrole_lorid=linked_object_roles.address
-        )
-        linked_parcel_and_address = select_or_insert.linked_parcel_and_address(db, model_linked_parcel_and_address)
+        if human:
+            _select_existing_linked_humans_and_addresses = sqlmodel.select(orm.HumanMailingAddress).where(
+                orm.HumanMailingAddress.humanmailing_humanid == human.humanid,
+                orm.HumanMailingAddress.linkedobjectrole_lorid == linked_object_roles.human,
+                orm.HumanMailingAddress.deactivatedts == None
+            )
+            existing_linked_humans_and_addresses = db.exec(_select_existing_linked_humans_and_addresses).all()
+            for _model_human in existing_linked_humans_and_addresses:
+                if _model_human.humanmailing_humanid != human.humanid:
+                    deactivate.linking_model(db, _model_human)
+            model_linked_human_and_address = orm.HumanMailingAddress(
+                human=human, mailingaddress=address, linkedobjectrole_lorid=linked_object_roles.human
+            )
+            linked_human_and_mailing_address = select_or_insert.linked_human_and_address(db, model_linked_human_and_address)
 
+        if human:
+            _select_existing_linked_humans_and_parcels = sqlmodel.select(orm.HumanParcel).where(
+                orm.HumanParcel.parcel_parcelkey == parcel.parcelkey,
+                orm.HumanParcel.linkedobjectrole_lorid == LinkedObjectRole.CURRENT_OWNER,
+                orm.HumanParcel.human_humanid != human.humanid,
+                orm.HumanParcel.deactivatedts == None,
+            )
+            existing_linked_humans_and_parcels = db.exec(_select_existing_linked_humans_and_parcels).all()
+            for _model_linked_human_and_parcel in existing_linked_humans_and_parcels:
+                if _model_linked_human_and_parcel.human_humanid != human.humanid:
+                    deactivate.linking_model(db, _model_linked_human_and_parcel)
+                    _model_linked_human_and_parcel_as_former_owner = orm.HumanParcel(
+                        human=human, parcel=parcel, linkedobjectrole_lorid=LinkedObjectRole.FORMER_OWNER
+                    )
+                    db.add(_model_linked_human_and_parcel_as_former_owner)
+            model_linked_human_and_parcel = orm.HumanParcel(
+                human=human, parcel=parcel, linkedobjectrole_lorid=LinkedObjectRole.CURRENT_OWNER
+            )
+            linked_human_and_parcel = select_or_insert.linked_human_and_parcel(db, model_linked_human_and_parcel)
 
-        _select_existing_linked_humans_and_addresses = sqlmodel.select(orm.HumanMailingAddress).where(
-            orm.HumanMailingAddress.humanmailing_humanid == human.humanid,
-            orm.HumanMailingAddress.linkedobjectrole_lorid == linked_object_roles.human,
-            orm.HumanMailingAddress.deactivatedts == None
-        )
-        existing_linked_humans_and_addresses = db.exec(_select_existing_linked_humans_and_addresses).all()
-        for _model_human in existing_linked_humans_and_addresses:
-            if _model_human.humanmailing_humanid != human.humanid:
-                deactivate.linking_model(db, _model_human)
-        model_linked_human_and_address = orm.HumanMailingAddress(
-            human=human, mailingaddress=address, linkedobjectrole_lorid=linked_object_roles.human
-        )
-        linked_human_and_mailing_address = select_or_insert.linked_human_and_address(db, model_linked_human_and_address)
-
-        _select_existing_linked_humans_and_parcels = sqlmodel.select(orm.HumanParcel).where(
-            orm.HumanParcel.parcel_parcelkey == parcel.parcelkey,
-            orm.HumanParcel.linkedobjectrole_lorid == LinkedObjectRole.CURRENT_OWNER,
-            orm.HumanParcel.human_humanid != human.humanid,
-            orm.HumanParcel.deactivatedts == None,
-        )
-        existing_linked_humans_and_parcels = db.exec(_select_existing_linked_humans_and_parcels).all()
-        for _model_linked_human_and_parcel in existing_linked_humans_and_parcels:
-            if _model_linked_human_and_parcel.human_humanid != human.humanid:
-                deactivate.linking_model(db, _model_linked_human_and_parcel)
-                _model_linked_human_and_parcel_as_former_owner = orm.HumanParcel(
-                    human=human, parcel=parcel, linkedobjectrole_lorid=LinkedObjectRole.FORMER_OWNER
-                )
-                db.add(_model_linked_human_and_parcel_as_former_owner)
-        model_linked_human_and_parcel = orm.HumanParcel(
-            human=human, parcel=parcel, linkedobjectrole_lorid=LinkedObjectRole.CURRENT_OWNER
-        )
-        linked_human_and_parcel = select_or_insert.linked_human_and_parcel(db, model_linked_human_and_parcel)
 
         # Ok, now time to re-serialize everything
         owner = schemas.Owner(
             name=human.name,
             is_multientity=human.multihuman
-        )
+        ) if not (human is None) else None
         mailing = schemas.Mailing(
             delivery=schemas.DeliveryAddressLine(
-                is_pobox=street.pobox,
-                attn=address.attention,
-                number=address.bldgno,
-                street=street.name,
-                secondary=address.secondary,
+                is_pobox=street.pobox if not street is None else None,
+                attn=address.attention if not address is None else None,
+                number=address.bldgno if not address is None else None,
+                street=street.name if not street is None else None,
+                secondary=address.secondary if not address is None else None,
             ),
             last=schemas.LastLine(
                 city=city_state_zip.city,
                 state=city_state_zip.state_abbr,
                 zip=city_state_zip.zip_code
             )
-        )
+        ) if not city_state_zip is None else None
         owners_and_mailing = schemas.OwnerAndMailing(
             owner=owner,
             mailing=mailing
