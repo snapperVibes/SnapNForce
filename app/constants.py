@@ -4,6 +4,7 @@ _AddressAndHumanRoles = namedtuple("AddressAndAddresseeRoles", ["address", "huma
 _GeneralAndMortgageRoles = namedtuple("GeneralAndMortgageRoles", ["general", "mortgage"])
 
 import warnings
+
 warnings.warn("LINKED OBJECT ROLES AREN'T CORRECT: 237 is a duplicate of 116 (currently owns)")
 
 
@@ -19,6 +20,9 @@ class LinkedObjectRole:
 
     CURRENT_OWNER = 116
     FORMER_OWNER = 117
+
+    CURRENT_TAX_ADDRESSEE = 0
+    FORMER_TAX_ADDRESSEE = 0
 
     @classmethod
     @property
@@ -50,4 +54,3 @@ class LinkedObjectRole:
 
 USER_ID = 99  # the id of "sylvia". Todo: new user id
 SOURCE_ID = None  # Todo: new source id
-

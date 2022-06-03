@@ -5,11 +5,6 @@ from app import orm
 from app.operations import select, insert, deactivate
 
 
-
-
-
-
-
 def _ensure_current(db: Session, select_func, insert_func, deactivate_func, model):
     try:
         select_func(db, **kwargs)

@@ -21,5 +21,3 @@ def linking_model(session: Session, model):
     model_type = type(model)
     statement = update(model_type).where(model_type.linkid == model.linkid).values(**_common)
     session.execute(statement)
-
-

@@ -111,7 +111,7 @@ from functools import wraps
 from time import sleep
 
 from app import orm
-from app.orm import  *
+from app.orm import *
 from app.operations.events import *
 
 from sqlmodel import Session, insert

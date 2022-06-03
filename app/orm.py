@@ -62,6 +62,7 @@ class HumanParcel(_LinkModel, table=True):
 class Login(_BaseModel, table=True):
     userid: int = Field(default=None, primary_key=True)
 
+
 class LinkedObjectRole(_BaseModel, table=True):
     lorid: int = Field(default=None, primary_key=True)
 
@@ -86,7 +87,6 @@ class Parcel(_BaseModel, table=True):
         """Allegheny County Real Estate Portal URL for the parcel."""
         # This property was originally created for debugging
         return f"https://www2.alleghenycounty.us/RealEstate/GeneralInfo.aspx?ParcelID={self.parcelidcnty}"
-
 
 
 class MailingAddress(_BaseModel, table=True):
