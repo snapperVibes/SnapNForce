@@ -4,17 +4,14 @@ import re
 from functools import partial
 from typing import Optional
 
-
 import sqlmodel
 from bs4 import NavigableString, Tag
 from sqlalchemy.exc import NoResultFound
 from sqlmodel import Session
-from sqlmodel.engine.result import ScalarResult
 
 from app import schemas, orm
-from app.constants import LinkedObjectRole
-from app.operations import ensure, deactivate, link
-from app.operations import select
+from app.constants import LinkedObjectRole, _AddressAndHumanRoles
+from app.operations import select, deactivate, link, ensure_current, insert, select_or_insert
 from app.schemas import CogGeneralAndMortgage
 from lib import scrape, parse
 
@@ -22,47 +19,148 @@ from lib import scrape, parse
 async def sync_parcel_data(db: Session, parcel_id: str) -> schemas.GeneralAndMortgage:
     _county_data = await get_parcel_data_from_county(parcel_id)
 
-    # Temp alias
-    d = _county_data  # data
-    p = orm.Parcel()
-    p.parcelidcnty=parcel_id
-    # p.muni_municode = None
+    general_owner_and_mailing = None
+    mortgage_owner_and_mailing = None
+
+    # todo: somehow get muni_municode filled in with _county_data, otherwise the insert doesn't work
+    model_parcel = orm.Parcel(parcelidcnty=parcel_id)
+    parcel = select.parcel(db, model_parcel)
+    parcel = parcel if parcel is not None else insert.parcel(db, model_parcel)
+
+    linked_object_roles: _AddressAndHumanRoles  # just a typehint because my editor couldn't figure out the correct type
+    for data, linked_object_roles in zip(
+        (_county_data.general, _county_data.mortgage),
+        (LinkedObjectRole.general_roles, LinkedObjectRole.mortgage_roles)
+    ):
+        model_city_state_zip = orm.MailingCityStateZip(
+            zip_code=data.mailing.last.zip,
+            state_abbr=data.mailing.last.state,
+            city=data.mailing.last.city
+        )
+        city_state_zip = select_or_insert.city_state_zip(db, model_city_state_zip)
+
+        model_street = orm.MailingStreet(
+            name=data.mailing.delivery.street,
+            pobox=data.mailing.delivery.is_pobox,
+            # relationships
+            citystatezip=city_state_zip
+        )
+        street = select_or_insert.street(db, model_street)
+
+        model_address = orm.MailingAddress(
+            bldgno=data.mailing.delivery.number,
+            attention=data.mailing.delivery.attn,
+            secondary=data.mailing.delivery.secondary,
+            # relationships
+            street=street
+        )
+        address = select_or_insert.address(db, model_address)
+
+        model_human = orm.Human(
+            name=data.owner.name,
+            multihuman=data.owner.is_multi_entity,
+            # businessentity=None,
+        )
+        human = select_or_insert.human(db, model_human)
+
+        # Todo: Let's write some wet code and fix it latter
+        # todo: remove unnecessary database calls
 
 
-    ma = orm.MailingAddress()
-    ma.bldgno
-    ma.secondary
-    ma.attention
-
-    s = orm.MailingStreet()
-    s.name
-    s.pobox
-
-    csz = orm.MailingCityStateZip()
-    csz.zip_code
-    csz.state_abbr
-    csz.city
-
-    s.citystatezip = csz
-    ma.street = s
-    breakpoint()
+        _select_existing_addresses_linked_to_parcel = sqlmodel.select(
+            orm.ParcelMailingAddress
+        ).where(
+            orm.ParcelMailingAddress.parcel_parcelkey == parcel.parcelkey,
+            orm.ParcelMailingAddress.linkedobjectrole_lorid == linked_object_roles.address,
+            orm.ParcelMailingAddress.mailingaddress_addressid != address.addressid,
+            orm.ParcelMailingAddress.deactivatedts == None
+        )
+        non_current_linked_parcels_and_addresses = db.exec(_select_existing_addresses_linked_to_parcel).all()
+        for _model_linked_parcel_and_address in non_current_linked_parcels_and_addresses:
+            deactivate.linking_model(db, _model_linked_parcel_and_address)
+        model_linked_parcel_and_address = orm.ParcelMailingAddress(
+            parcel=parcel, mailingaddress=address, linkedobjectrole_lorid=linked_object_roles.address
+        )
+        linked_parcel_and_address = select_or_insert.linked_parcel_and_address(db, model_linked_parcel_and_address)
 
 
+        _select_existing_linked_humans_and_addresses = sqlmodel.select(orm.HumanMailingAddress).where(
+            orm.HumanMailingAddress.humanmailing_humanid == human.humanid,
+            orm.HumanMailingAddress.linkedobjectrole_lorid == linked_object_roles.human,
+            orm.HumanMailingAddress.deactivatedts == None
+        )
+        existing_linked_humans_and_addresses = db.exec(_select_existing_linked_humans_and_addresses).all()
+        for _model_human in existing_linked_humans_and_addresses:
+            if _model_human.humanmailing_humanid != human.humanid:
+                deactivate.linking_model(db, _model_human)
+        model_linked_human_and_address = orm.HumanMailingAddress(
+            human=human, mailingaddress=address, linkedobjectrole_lorid=linked_object_roles.human
+        )
+        linked_human_and_mailing_address = select_or_insert.linked_human_and_address(db, model_linked_human_and_address)
+
+        _select_existing_linked_humans_and_parcels = sqlmodel.select(orm.HumanParcel).where(
+            orm.HumanParcel.parcel_parcelkey == parcel.parcelkey,
+            orm.HumanParcel.linkedobjectrole_lorid == LinkedObjectRole.CURRENT_OWNER,
+            orm.HumanParcel.human_humanid != human.humanid,
+            orm.HumanParcel.deactivatedts == None,
+        )
+        existing_linked_humans_and_parcels = db.exec(_select_existing_linked_humans_and_parcels).all()
+        for _model_linked_human_and_parcel in existing_linked_humans_and_parcels:
+            if _model_linked_human_and_parcel.human_humanid != human.humanid:
+                deactivate.linking_model(db, _model_linked_human_and_parcel)
+                _model_linked_human_and_parcel_as_former_owner = orm.HumanParcel(
+                    human=human, parcel=parcel, linkedobjectrole_lorid=LinkedObjectRole.FORMER_OWNER
+                )
+                db.add(_model_linked_human_and_parcel_as_former_owner)
+        model_linked_human_and_parcel = orm.HumanParcel(
+            human=human, parcel=parcel, linkedobjectrole_lorid=LinkedObjectRole.CURRENT_OWNER
+        )
+        linked_human_and_parcel = select_or_insert.linked_human_and_parcel(db, model_linked_human_and_parcel)
+
+        # Ok, now time to re-serialize everything
+        owner = schemas.Owner(
+            name=human.name,
+            is_multientity=human.multihuman
+        )
+        mailing = schemas.Mailing(
+            delivery=schemas.DeliveryAddressLine(
+                is_pobox=street.pobox,
+                attn=address.attention,
+                number=address.bldgno,
+                street=street.name,
+                secondary=address.secondary,
+            ),
+            last=schemas.LastLine(
+                city=city_state_zip.city,
+                state=city_state_zip.state_abbr,
+                zip=city_state_zip.zip_code
+            )
+        )
+        owners_and_mailing = schemas.OwnerAndMailing(
+            owner=owner,
+            mailing=mailing
+        )
+        if linked_object_roles.human == LinkedObjectRole.general_roles.human:
+            general_owner_and_mailing = owners_and_mailing
+        elif linked_object_roles.human == LinkedObjectRole.mortgage_roles.human:
+            mortgage_owner_and_mailing = owners_and_mailing
+        else:
+            raise RuntimeError("failed sanity check")
+
+    return schemas.GeneralAndMortgage(
+        general=general_owner_and_mailing,
+        mortgage=mortgage_owner_and_mailing,
+    )
 
 
-    p.humans = None
-    county_data = scraped_to_tables(_county_data)
-
-
-    parcel = select.parcel(db, county_parcel_id=parcel_id)
 
 
 
 
 
-def scraped_to_tables(data: schemas.GeneralAndMortgage):
 
-    breakpoint()
+
+
 
 
 
@@ -188,32 +286,32 @@ def scraped_to_tables(data: schemas.GeneralAndMortgage):
 #     )
 
 
-
-def _cog_tables_to_owner_and_mailing(t: schemas.CogTables) -> schemas.OwnerAndMailing:
-    # Todo: long-winded ternary statements are not very Pythonic.
-    #  Break into actual if / else clauses
-    owner = None if (t is None or t.human is None) else schemas.Owner(
-            name=t.human.name,
-            is_multi_entity=t.human.multihuman
-        )
-    mailing = None if (t is None or not t.has_address_tables) else schemas.Mailing(
-        delivery_line=schemas.DeliveryAddressLine(
-            is_pobox=t.street.pobox,
-            attn=t.address.attention,
-            number=t.address.bldgno,
-            street=t.street.name,
-            secondary=t.address.secondary,
-        ),
-        last_line=schemas.LastLine(
-            city=t.city_state_zip.city,
-            state=t.city_state_zip.state_abbr,
-            zip=t.city_state_zip.zip_code
-        )
-    )
-    return schemas.OwnerAndMailing(
-        owner=owner,
-        mailing=mailing
-    )
+#
+# def _cog_tables_to_owner_and_mailing(t: schemas.CogTables) -> schemas.OwnerAndMailing:
+#     # Todo: long-winded ternary statements are not very Pythonic.
+#     #  Break into actual if / else clauses
+#     owner = None if (t is None or t.human is None) else schemas.Owner(
+#             name=t.human.name,
+#             is_multi_entity=t.human.multihuman
+#         )
+#     mailing = None if (t is None or not t.has_address_tables) else schemas.Mailing(
+#         delivery_line=schemas.DeliveryAddressLine(
+#             is_pobox=t.street.pobox,
+#             attn=t.address.attention,
+#             number=t.address.bldgno,
+#             street=t.street.name,
+#             secondary=t.address.secondary,
+#         ),
+#         last_line=schemas.LastLine(
+#             city=t.city_state_zip.city,
+#             state=t.city_state_zip.state_abbr,
+#             zip=t.city_state_zip.zip_code
+#         )
+#     )
+#     return schemas.OwnerAndMailing(
+#         owner=owner,
+#         mailing=mailing
+#     )
 
 
 
@@ -299,49 +397,49 @@ def _clean_whitespace(text: str) -> str:
     return re.sub(r"\s+", " ", text)
 
 
-def get_cog_tables(db, parcel_id):
-    all_addresses = []
-    parcel = select.parcel(db, parcel_id)
-    if parcel is None:
-        raise RuntimeError
-        # return schemas.CogGeneralAndMortgage(general=None, mortgage=None)
-    parcel_addresses = select.parcel_mailing_addresses(db, parcel.parcelkey)
-    for (parcel_address,) in parcel_addresses:
-        address = select.address(db, parcel_address.mailingaddress_addressid)
-        street = select.street(db, address.street_streetid)
-        city_state_zip = select.city_state_zip(db, street.citystatezip_cszipid)
-        try:
-            human_address = select.human_mailing_address(db, address.addressid)
-            human = select.human(db, human_address.humanmailing_humanid)
-        except NoResultFound:
-            human_address = human = None
-        tables = schemas.CogTables(
-            address=address,
-            parcel_address=parcel_address,
-            street=street,
-            city_state_zip=city_state_zip,
-            human=human,
-            human_address=human_address,
-        )
-        all_addresses.append(tables)
-    # todo: this only works because we are currently lax and accept optional tables
-    #  it would be nice to roll this logic into the above code
-    general = _match_general(all_addresses) or schemas.CogTables()
-    mortgage = _match_mortgage(all_addresses) or schemas.CogTables()
-    general.parcel = mortgage.parcel = parcel
-    return schemas.CogGeneralAndMortgage(general=general, mortgage=mortgage)
+# def get_cog_tables(db, parcel_id):
+#     all_addresses = []
+#     parcel = select.parcel(db, parcel_id)
+#     if parcel is None:
+#         raise RuntimeError
+#         # return schemas.CogGeneralAndMortgage(general=None, mortgage=None)
+#     parcel_addresses = select.parcel_mailing_addresses(db, parcel.parcelkey)
+#     for (parcel_address,) in parcel_addresses:
+#         address = select.address(db, parcel_address.mailingaddress_addressid)
+#         street = select.street(db, address.street_streetid)
+#         city_state_zip = select.city_state_zip(db, street.citystatezip_cszipid)
+#         try:
+#             human_address = select.human_mailing_address(db, address.addressid)
+#             human = select.human(db, human_address.humanmailing_humanid)
+#         except NoResultFound:
+#             human_address = human = None
+#         tables = schemas.CogTables(
+#             address=address,
+#             parcel_address=parcel_address,
+#             street=street,
+#             city_state_zip=city_state_zip,
+#             human=human,
+#             human_address=human_address,
+#         )
+#         all_addresses.append(tables)
+#     # todo: this only works because we are currently lax and accept optional tables
+#     #  it would be nice to roll this logic into the above code
+#     general = _match_general(all_addresses) or schemas.CogTables()
+#     mortgage = _match_mortgage(all_addresses) or schemas.CogTables()
+#     general.parcel = mortgage.parcel = parcel
+#     return schemas.CogGeneralAndMortgage(general=general, mortgage=mortgage)
+#
+#
+# def _match_number(num_to_match: int, owners_and_mailings: list[schemas.CogTables]):
+#     for x in owners_and_mailings:
+#         if x.parcel_address.linkedobjectrole_lorid == num_to_match:
+#             return x
+#     return None
+#
+#
+# _match_general = partial(_match_number, LinkedObjectRole.GENERAL_HUMAN_MAILING_ADDRESS)
+# _match_mortgage = partial(_match_number, LinkedObjectRole.MORTGAGE_HUMAN_MAILING_ADDRESS)
 
 
-def _match_number(num_to_match: int, owners_and_mailings: list[schemas.CogTables]):
-    for x in owners_and_mailings:
-        if x.parcel_address.linkedobjectrole_lorid == num_to_match:
-            return x
-    return None
-
-
-_match_general = partial(_match_number, LinkedObjectRole.GENERAL_HUMAN_MAILING_ADDRESS)
-_match_mortgage = partial(_match_number, LinkedObjectRole.MORTGAGE_HUMAN_MAILING_ADDRESS)
-
-
-def select_all_parcels_in_municode(db: Session, *, municode: int):
-    return select.parcels_by_municode(db, municode=municode)
+# def select_all_parcels_in_municode(db: Session, *, municode: int):
+#     return select.parcels_by_municode(db, municode=municode)

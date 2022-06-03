@@ -1,3 +1,4 @@
+import dataclasses
 from datetime import datetime as DateTime
 from typing import Optional, List
 
@@ -13,46 +14,78 @@ class _BaseModel(SQLModel):
     deactivatedby_userid: Optional[int] = Field(default=None, foreign_key="login.userid")
 
 
-# Linking Tables
-###
-
-
 class _LinkModel(_BaseModel):
     linkid: int = Field(default=None, primary_key=True)
     linkedobjectrole_lorid: int = Field(foreign_key="linkedobjectrole.lorid")
 
 
+# Link tables
+###
+
+
 class ParcelMailingAddress(_LinkModel, table=True):
     __tablename__ = "parcelmailingaddress"
 
-
-    parcel_parcelkey: Optional[int] = Field(default=None, foreign_key="parcel.parcelkey", primary_key=True)
-    mailingaddress_addressid: Optional[int] = Field(default=None, foreign_key="mailingaddress.addressid", primary_key=True)
+    parcel_parcelkey: Optional[int] = Field(
+        default=None, foreign_key="parcel.parcelkey", primary_key=True
+    )
+    mailingaddress_addressid: Optional[int] = Field(
+        default=None, foreign_key="mailingaddress.addressid", primary_key=True
+    )
 
     parcel: "Parcel" = Relationship(back_populates="mailingaddress_links")
     mailingaddress: "MailingAddress" = Relationship(back_populates="parcel_links")
 
 
 class HumanMailingAddress(_LinkModel, table=True):
-    humanmailing_humanid: int = Field(foreign_key="human.humanid", primary_key=True)
-    humanmailing_addressid: int = Field(foreign_key="mailingaddress.addressid", primary_key=True)
+    humanmailing_humanid: int = Field(default=None, foreign_key="human.humanid", primary_key=True)
+    humanmailing_addressid: int = Field(
+        default=None, foreign_key="mailingaddress.addressid", primary_key=True
+    )
+
+    human: "Human" = Relationship(back_populates="mailingaddress_links")
+    mailingaddress: "MailingAddress" = Relationship(back_populates="human_links")
 
 
 class HumanParcel(_LinkModel, table=True):
-    human_humanid: int = Field(foreign_key="human.humanid")
-    parcel_parcelkey: int = Field(foreign_key="parcel.parcelkey")
+    human_humanid: int = Field(default=None, foreign_key="human.humanid", primary_key=True)
+    parcel_parcelkey: int = Field(default=None, foreign_key="parcel.parcelkey", primary_key=True)
 
-    source_sourceid: int = Field(foreign_key="bobsource.sourceid")
-    linkedobjectrole_lorid: int = Field(foreign_key="linkedobjectrole.lorid")
+    parcel: "Parcel" = Relationship(back_populates="human_links")
+    human: "Human" = Relationship(back_populates="parcel_links")
 
 
 # Data tables
 ###
 
 
+class Login(_BaseModel, table=True):
+    userid: int = Field(default=None, primary_key=True)
+
+class LinkedObjectRole(_BaseModel, table=True):
+    lorid: int = Field(default=None, primary_key=True)
+
+
 class Municipality(SQLModel, table=True):
     municode: int = Field(default=None, primary_key=True)
     muniname: str
+
+
+class Parcel(_BaseModel, table=True):
+    __tablename__ = "parcel"
+
+    parcelkey: int = Field(default=None, primary_key=True)
+    parcelidcnty: str
+    muni_municode: int = Field(default=None, foreign_key="municipality.municode")
+
+    mailingaddress_links: List[ParcelMailingAddress] = Relationship(back_populates="parcel")
+    human_links: List["HumanParcel"] = Relationship(back_populates="parcel")
+
+    @property
+    def url(self):
+        """Allegheny County Real Estate Portal URL for the parcel."""
+        # This property was originally created for debugging
+        return f"https://www2.alleghenycounty.us/RealEstate/GeneralInfo.aspx?ParcelID={self.parcelidcnty}"
 
 
 
@@ -65,36 +98,9 @@ class MailingAddress(_BaseModel, table=True):
     attention: Optional[str]
     secondary: Optional[str]
 
-    parcel_links: List["ParcelMailingAddress"] = Relationship(back_populates="mailingaddress")
-    # parcels: List["Parcel"] = Relationship(
-    #     back_populates="mailing_addresses", link_model=ParcelMailingAddress
-    # )
     street: "MailingStreet" = Relationship(back_populates="mailing_addresses")
-    humans: List["Human"] = Relationship(back_populates="mailing_addresses", link_model=HumanMailingAddress)
-
-
-
-class Parcel(_BaseModel, table=True):
-    __tablename__ = "parcel"
-
-    parcelkey: int = Field(default=None, primary_key=True)
-    parcelidcnty: str
-    muni_municode: int = Field(default=None, foreign_key="municipality.municode")
-
-    mailingaddress_links: List[ParcelMailingAddress] = Relationship(back_populates="parcel")
-
-    # mailing_addresses: List["MailingAddress"] = Relationship(
-    #     back_populates="parcels", link_model=ParcelMailingAddress
-    # )
-    humans: List["Human"] = Relationship(
-        back_populates="parcels", link_model=HumanParcel
-    )
-
-    @property
-    def url(self):
-        """Allegheny County Real Estate Portal URL for the parcel."""
-        # This property was originally created for debugging
-        return f"https://www2.alleghenycounty.us/RealEstate/GeneralInfo.aspx?ParcelID={self.parcelidcnty}"
+    parcel_links: List["ParcelMailingAddress"] = Relationship(back_populates="mailingaddress")
+    human_links: List["HumanMailingAddress"] = Relationship(back_populates="mailingaddress")
 
 
 class MailingStreet(_BaseModel, table=True):
@@ -104,7 +110,6 @@ class MailingStreet(_BaseModel, table=True):
     pobox: Optional[bool]
 
     mailing_addresses: List[MailingAddress] = Relationship(back_populates="street")
-
     citystatezip: "MailingCityStateZip" = Relationship(back_populates="streets")
 
 
@@ -114,6 +119,7 @@ class MailingCityStateZip(_BaseModel, table=True):
     state_abbr: str
     city: str
 
+    # one to many: list of mailingstreets
     streets: List[MailingStreet] = Relationship(back_populates="citystatezip")
 
 
@@ -123,8 +129,5 @@ class Human(_BaseModel, table=True):
     businessentity: bool
     multihuman: Optional[bool]
 
-    mailing_addresses: List["MailingAddress"] = Relationship(back_populates="humans", link_model=HumanMailingAddress)
-    parcels: List["Parcel"] = Relationship(back_populates="humans", link_model=HumanParcel)
-
-
-
+    mailingaddress_links: List["HumanMailingAddress"] = Relationship(back_populates="human")
+    parcel_links: List["HumanParcel"] = Relationship(back_populates="human")

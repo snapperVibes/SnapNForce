@@ -7,7 +7,7 @@ from sqlalchemy.engine import Connection
 from sqlalchemy.exc import MultipleResultsFound
 
 from app import database
-from app.database import get_db_context, SessionLocal
+from app.database import get_db_context
 from app.lib import sync_parcel_data
 
 logging.basicConfig(filename=path.join("log", "_test.log"), filemode="a", level=logging.INFO)
@@ -28,6 +28,7 @@ async def main():
     with get_db_context() as conn:
         parcel_ids = get_parcel_ids(conn)
     import sqlmodel
+
     with sqlmodel.Session(database._engine) as db:
         for i, parcel_id in enumerate(parcel_ids):
             if i < SKIP_TO:

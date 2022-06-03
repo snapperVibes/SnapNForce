@@ -12,6 +12,7 @@ APPEAL = "Appeal"
 MAP = "Map"
 
 
+# Todo: make threadsafe
 _client = {"async": None}
 
 
