@@ -1,18 +1,16 @@
 # """ Common functions made from the primitives found in lib"""
 # fmt: off
 import re
-from functools import partial
 from typing import Optional
 
 import sqlmodel
 from bs4 import NavigableString, Tag
-from sqlalchemy.exc import NoResultFound
 from sqlmodel import Session
 
 from app import schemas, orm
 from app.constants import LinkedObjectRole, _AddressAndHumanRoles
-from app.operations import select, deactivate, link, ensure_current, insert, select_or_insert
-from app.schemas import CogGeneralAndMortgage
+from app.logging import logger
+from app.operations import select, deactivate, insert, select_or_insert
 from lib import scrape, parse
 
 
@@ -156,10 +154,12 @@ async def sync_parcel_data(db: Session, parcel_id: str) -> schemas.GeneralAndMor
         else:
             raise RuntimeError("failed sanity check")
 
-    return schemas.GeneralAndMortgage(
+    out = schemas.GeneralAndMortgage(
         general=general_owner_and_mailing,
         mortgage=mortgage_owner_and_mailing,
     )
+    logger.debug("Synced parcel", parcel_id=parcel_id, result=out)
+    return out
 
 
 
@@ -452,3 +452,6 @@ def _clean_whitespace(text: str) -> str:
 
 # def select_all_parcels_in_municode(db: Session, *, municode: int):
 #     return select.parcels_by_municode(db, municode=municode)
+def select_all_parcels_in_municode(db, municode):
+    statement = sqlmodel.select(orm.Parcel).where(orm.Parcel.muni_municode==municode)
+    return db.exec(statement)

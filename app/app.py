@@ -1,3 +1,4 @@
+import logging
 import random
 import time
 
@@ -6,6 +7,7 @@ from sqlmodel import Session
 
 from app import lib, schemas
 from app.database import get_db
+from app.logging import logger
 from lib.parse.exceptions import HtmlParsingError
 
 app = FastAPI()
@@ -32,13 +34,19 @@ async def sync_municipality(municode: int, db: Session = Depends(get_db)):
     sync_data = schemas.MunicipalitySyncData(total=0, skipped=[])
 
     for parcel in lib.select_all_parcels_in_municode(db, municode=municode):
+        success = None
         try:
             await lib.sync_parcel_data(db, parcel_id=parcel.parcelidcnty)
+            success = True
         except HtmlParsingError:
             sync_data.skipped.append(parcel.parcelkey)
+            success = False
         finally:
             sync_data.total += 1
+            logger.info("Synced parcel", parcel_count=sync_data.total, skipped_count=len(sync_data.skipped), success=success)
             time.sleep(1)
+
+    logger.info("Finished syncing municipality\n\n\n", municode=municode, skipped_count=len(sync_data.skipped), skipped_parcels=sync_data.skipped)
     return sync_data
 
 
