@@ -55,3 +55,12 @@ class CogTables(SQLModel):
 class CogGeneralAndMortgage(SQLModel):
     general: Optional[CogTables]
     mortgage: Optional[CogTables]
+
+
+class SyncedParcelSummery(SQLModel):
+    pass
+
+
+class MunicipalitySyncData(SQLModel):
+    total: int
+    skipped: list[str]
