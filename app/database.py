@@ -37,6 +37,6 @@ def get_db():
 
 @contextmanager
 def get_db_context():
-    # For use outside of FastAPI
+    # For use outside FastAPI
     with Session(_engine) as conn:
         yield conn

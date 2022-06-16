@@ -49,9 +49,3 @@ async def sync_municipality(municode: int, db: Session = Depends(get_db)):
     logger.info("Finished syncing municipality\n\n\n", municode=municode, skipped_count=len(sync_data.skipped), skipped_parcels=sync_data.skipped)
     return sync_data
 
-
-@app.get("/temp/consolidate")
-def consolidate(municode: int):
-    import app.temp.cons
-
-    app.temp.cons.main(municode)
