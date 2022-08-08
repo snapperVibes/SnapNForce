@@ -1,8 +1,7 @@
 import pytest
 
-import app
 from lib.parse import mortgage_delivery_address_line as parse
-from lib.models import DeliveryAddressLine
+from app.schemas import DeliveryAddressLine
 from lark.exceptions import UnexpectedEOF
 
 # test format
@@ -11,7 +10,7 @@ from lark.exceptions import UnexpectedEOF
 #       e<xpected> = Line1(is_pobox=True, attn=None, number='EXAMPLE', street=None)
 #       assert a == e
 #
-# Play with the grammer here:
+# Play with the grammar here:
 #  https://www.lark-parser.org/ide/
 
 
