@@ -2,6 +2,7 @@
 from lark import Transformer, LarkError
 from lib.parse._common import _make_parser, _extract_zip_code
 from lib.parse.models import DeliveryAddressLine, LastLine
+import re
 
 general_parser = _make_parser("general")
 
@@ -73,5 +74,27 @@ def general_delivery_address_line(text: str) -> DeliveryAddressLine:
         raise
 
 def general_city_state_zip(text: str) -> LastLine:
-    city, _comma, state, zip_ = text.split("\xa0")
-    return LastLine(city=city, state=state, zip=_extract_zip_code(zip_))
+    '''
+        Extracts city, state, and zip from a given text string that contains
+        these values in the form CITY, ST ZIP-+FOUR?
+    '''
+    try:
+        city_comma_loc = text.index(',')
+    except ValueError:
+        raise HtmlParsingError
+    
+    city = text[0:city_comma_loc]
+    
+    statere = re.compile(r'[A-Z]{2}\s')
+    statem = statere.search(text)
+    
+    zipre = re.compile(r'[0-9]{5}')
+    zipm = zipre.search(text)
+    
+    # Original SNAPPER approach that only works for Allegheny County's
+    # owner mailing address. The County's encoding of the property's 
+    # address does not have nonbreaking spaces in the same places
+    # city, _comma, state, zip_ = text.split("\xa0")
+#    return LastLine(city=city, state=statem.group(), zip=_extract_zip_code(zip_))
+ 
+    return LastLine(city=city, state=statem.group(), zip=zipm.group())

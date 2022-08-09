@@ -20,9 +20,14 @@ class OwnerAndMailing(SQLModel):
     owner: Optional[Owner] = None
     mailing: Optional[Mailing] = None
 
+class ParceladdrAndOwnerAndMailing(SQLModel):
+    parceladdr: Optional[Mailing] = None
+    owner: Optional[Owner] = None
+    mailing: Optional[Mailing] = None
+
 
 class GeneralAndMortgage(SQLModel):
-    general: OwnerAndMailing
+    general: ParceladdrAndOwnerAndMailing
     mortgage: OwnerAndMailing
 
 

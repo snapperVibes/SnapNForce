@@ -336,10 +336,11 @@ async def get_parcel_data_from_county(parcel_id: str) -> schemas.GeneralAndMortg
 async def get_general_data_from_county(parcel_id: str):
     response = await scrape.general_info(parcel_id)
     response.raise_for_status()
-    _owner, _mailing = parse.general_html_content(response.content)
+    _parceladdr, _owner, _mailing = parse.general_html_content(response.content)
+    parceladdr = mailing_from_raw_general(_parceladdr)
     owner = owner_from_raw(_owner)
     mailing = mailing_from_raw_general(_mailing)
-    return schemas.OwnerAndMailing(owner=owner, mailing=mailing)
+    return schemas.ParceladdrAndOwnerAndMailing(parceladdr=parceladdr, owner=owner, mailing=mailing)
 
 
 async def get_tax_data_from_county(parcel_id: str):
@@ -377,7 +378,7 @@ def mailing_from_raw_tax(data: list[Tag | NavigableString]) -> Optional[schemas.
     elif not address_list:
         return None
     else:
-        raise NotImplementedError("I haven't dealt with this yet")
+        raise NotImplementedError("lib.mailing_from_raw_tax : I haven't dealt with this yet")
     return schemas.Mailing(delivery=delivery_line, last=last_line)
 
 

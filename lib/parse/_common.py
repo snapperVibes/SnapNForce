@@ -13,6 +13,12 @@ def _make_parser(name: str):
 
 # Todo: decide whether to use Regex or string methods
 def _extract_zip_code(text: str) -> str:
-    return text.split("-")[0]
+    if text:
+        if text.find("-") > 0:
+           return text.split("-")[0]
+        else: 
+            return text
+    else:
+        throw
 
 # _zip_code = re.compile(r"(\d{5})(-\d{4})?")
