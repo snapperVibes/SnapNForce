@@ -30,18 +30,14 @@ def _select_or_insert(
     insert_event=UnimplementedEvent) -> typing.Optional[ModelType]:
     if model is None:
         return None
-    _model = select_func(db, model)
-    if _model is None:
-        db.add(model)
+    returned_model = select_func(db, model)
+    if returned_model is None:
+        returned_model = model
         for k, v in _common.items():
-            setattr(model, k, v)
-        db.refresh(model)
-        _model = model  # a little SQLachemy magic  - supposed to return an object with the assigned ID
-        # not completely sure this is happening yet from SNAPPERS.
-        # ECD - this is really not happening yet
-        print("EDIELOG:select_or_insert._select_or_insert: we did the add passing in weird _model: ", _model)
-        db.commit()
-    return _model
+            setattr(returned_model, k, v)
+        db.add(returned_model)
+        db.commit()  # Todo: this should probably be elsewhere?
+    return returned_model
 
 
 def parcel(db, model):
