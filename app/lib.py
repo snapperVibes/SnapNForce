@@ -137,7 +137,6 @@ async def sync_parcel_data(db: Session, parcel_id: str, municode: int) -> schema
             model_linked_parcel_and_address = orm.ParcelMailingAddress(
                 parcel=parcel, mailingaddress=address, linkedobjectrole_lorid=linked_object_roles.address
             )
-            breakpoint()
             linked_parcel_and_address = select_or_insert.linked_parcel_and_address(db, model_linked_parcel_and_address)
             print('^^^^^ ECDLOG | sync | linked_parcel_and_address: ', linked_parcel_and_address)
         if human:
