@@ -24,6 +24,13 @@ class LinkedObjectRole:
     CURRENT_TAX_ADDRESSEE = 0
     FORMER_TAX_ADDRESSEE = 0
 
+
+
+    @classmethod
+    @property
+    def cogland(cls):
+        return 999
+
     @classmethod
     @property
     def general_roles(cls):
@@ -54,3 +61,4 @@ class LinkedObjectRole:
 
 USER_ID = 99  # the id of "sylvia". Todo: new user id
 SOURCE_ID = None  # Todo: new source id
+COGLAND_MUNICODE = 999

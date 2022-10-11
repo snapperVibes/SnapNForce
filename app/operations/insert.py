@@ -2,6 +2,12 @@ from sqlalchemy import func
 
 from app.constants import USER_ID, SOURCE_ID
 
+# this file doesn't need to exist.
+# this is being replaced by the new event system where Events are a class and not a decorator
+# got rid of the insert bit and used db.add()
+# we don't have insert functions for events
+
+
 _common = {
     "createdts": func.now(),
     "createdby_userid": USER_ID,
@@ -117,7 +123,9 @@ from app.operations.events import *
 from sqlmodel import Session, insert
 
 
+# Event model in process of being upgraded to the standard form using _select_or_insert
 def insert_event(event_type=None):
+    # SNAPPER not yet finished guts for events
     if event_type is None:
         event = UnimplementedEvent()
     else:
@@ -139,7 +147,7 @@ def insert_event(event_type=None):
     return inner_func
 
 
-@insert_event(event_type=None)
+@insert_event(event_type=None)  # these event decorators are not working yet
 def city_state_zip(db: Session, model: orm.MailingCityStateZip):
     statement = (
         insert(orm.MailingCityStateZip)

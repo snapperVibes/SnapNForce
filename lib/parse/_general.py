@@ -64,6 +64,7 @@ class GeneralTransformer(Transformer):
             secondary=self._secondary
         )
 
+
 def general_delivery_address_line(text: str) -> DeliveryAddressLine:
     try:
         tree = general_parser.parse(text)
@@ -73,10 +74,17 @@ def general_delivery_address_line(text: str) -> DeliveryAddressLine:
         print(str(err))
         raise
 
+
 def general_city_state_zip(text: str) -> LastLine:
     '''
-        Extracts city, state, and zip from a given text string that contains
-        these values in the form CITY, ST ZIP-+FOUR?
+
+    Parameters
+    ----------
+    text
+
+    Returns
+    -------
+
     '''
     try:
         city_comma_loc = text.index(',')
@@ -85,7 +93,7 @@ def general_city_state_zip(text: str) -> LastLine:
     
     city = text[0:city_comma_loc]
     
-    statere = re.compile(r'[A-Z]{2}\s')
+    statere = re.compile(r',\s*([A-Z]{2})\s')
     statem = statere.search(text)
     
     zipre = re.compile(r'[0-9]{5}')
@@ -95,6 +103,6 @@ def general_city_state_zip(text: str) -> LastLine:
     # owner mailing address. The County's encoding of the property's 
     # address does not have nonbreaking spaces in the same places
     # city, _comma, state, zip_ = text.split("\xa0")
-#    return LastLine(city=city, state=statem.group(), zip=_extract_zip_code(zip_))
+   # return LastLine(city=city, state=statem.group(), zip=_extract_zip_code(zip_))
  
-    return LastLine(city=city, state=statem.group(), zip=zipm.group())
+    return LastLine(city=city, state=statem.group(1).lstrip().rstrip(), zip=zipm.group())
