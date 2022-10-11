@@ -27,19 +27,19 @@ class ParcelMailingAddress(_LinkModel, table=True):
     __tablename__ = "parcelmailingaddress"
 
     parcel_parcelkey: Optional[int] = Field(
-        default=None, foreign_key="parcel.parcelkey", primary_key=True
+        default=None, foreign_key="parcel.parcelkey"
     )
     mailingaddress_addressid: Optional[int] = Field(
-        default=None, foreign_key="mailingaddress.addressid", primary_key=True
+        default=None, foreign_key="mailingaddress.addressid"
     )
     parcel: "Parcel" = Relationship(back_populates="mailingaddress_links")
     mailingaddress: "MailingAddress" = Relationship(back_populates="parcel_links")
 
 
 class HumanMailingAddress(_LinkModel, table=True):
-    humanmailing_humanid: int = Field(default=None, foreign_key="human.humanid", primary_key=True)
+    humanmailing_humanid: int = Field(default=None, foreign_key="human.humanid")
     humanmailing_addressid: int = Field(
-        default=None, foreign_key="mailingaddress.addressid", primary_key=True
+        default=None, foreign_key="mailingaddress.addressid"
     )
 
     human: "Human" = Relationship(back_populates="mailingaddress_links")
@@ -47,8 +47,8 @@ class HumanMailingAddress(_LinkModel, table=True):
 
 
 class HumanParcel(_LinkModel, table=True):
-    human_humanid: int = Field(default=None, foreign_key="human.humanid", primary_key=True)
-    parcel_parcelkey: int = Field(default=None, foreign_key="parcel.parcelkey", primary_key=True)
+    human_humanid: int = Field(default=None, foreign_key="human.humanid")
+    parcel_parcelkey: int = Field(default=None, foreign_key="parcel.parcelkey")
 
     parcel: "Parcel" = Relationship(back_populates="human_links")
     human: "Human" = Relationship(back_populates="parcel_links")
