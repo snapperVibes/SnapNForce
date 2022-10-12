@@ -15,7 +15,7 @@ class _BaseModel(SQLModel):
 
 
 class _LinkModel(_BaseModel):
-    linkid: int = Field(default=None, primary_key=True)
+    linkid: Optional[int] = Field(default=None, primary_key=True)
     linkedobjectrole_lorid: int = Field(foreign_key="linkedobjectrole.lorid")
 
 
@@ -27,20 +27,19 @@ class ParcelMailingAddress(_LinkModel, table=True):
     __tablename__ = "parcelmailingaddress"
 
     parcel_parcelkey: Optional[int] = Field(
-        default=None, foreign_key="parcel.parcelkey", primary_key=True
+        default=None, foreign_key="parcel.parcelkey"
     )
     mailingaddress_addressid: Optional[int] = Field(
-        default=None, foreign_key="mailingaddress.addressid", primary_key=True
+        default=None, foreign_key="mailingaddress.addressid"
     )
-
     parcel: "Parcel" = Relationship(back_populates="mailingaddress_links")
     mailingaddress: "MailingAddress" = Relationship(back_populates="parcel_links")
 
 
 class HumanMailingAddress(_LinkModel, table=True):
-    humanmailing_humanid: int = Field(default=None, foreign_key="human.humanid", primary_key=True)
+    humanmailing_humanid: int = Field(default=None, foreign_key="human.humanid")
     humanmailing_addressid: int = Field(
-        default=None, foreign_key="mailingaddress.addressid", primary_key=True
+        default=None, foreign_key="mailingaddress.addressid"
     )
 
     human: "Human" = Relationship(back_populates="mailingaddress_links")
@@ -48,16 +47,14 @@ class HumanMailingAddress(_LinkModel, table=True):
 
 
 class HumanParcel(_LinkModel, table=True):
-    human_humanid: int = Field(default=None, foreign_key="human.humanid", primary_key=True)
-    parcel_parcelkey: int = Field(default=None, foreign_key="parcel.parcelkey", primary_key=True)
+    human_humanid: int = Field(default=None, foreign_key="human.humanid")
+    parcel_parcelkey: int = Field(default=None, foreign_key="parcel.parcelkey")
 
     parcel: "Parcel" = Relationship(back_populates="human_links")
     human: "Human" = Relationship(back_populates="parcel_links")
 
 
 # Data tables
-###
-
 
 class Login(_BaseModel, table=True):
     userid: int = Field(default=None, primary_key=True)
@@ -128,6 +125,46 @@ class Human(_BaseModel, table=True):
     name: str
     businessentity: bool
     multihuman: Optional[bool]
-
     mailingaddress_links: List["HumanMailingAddress"] = Relationship(back_populates="human")
     parcel_links: List["HumanParcel"] = Relationship(back_populates="human")
+
+
+class BObSource(SQLModel, table=True):
+    __tablename__ = "bobsource"
+    sourceid: Optional[int] = Field(default=None, primary_key=True)
+    title: Optional[str]
+    description: Optional[str]
+    creator: Optional[int]
+    muni_municode: Optional[int]
+    userattributable: Optional[bool]
+    active: Optional[bool]
+    notes: Optional[str]
+
+
+class ParcelInfo(_BaseModel, table=True):
+    __tablename__ = "parceldata"
+
+    parcelidinfo: Optional[int] = Field(default=None, primary_key=True)
+    parcel_parcelkey: Optional[str]
+    usegroup: Optional[str]
+    constructiontype: Optional[str]
+    countycode: Optional[str]
+    notes: Optional[str]
+    ownercode: Optional[str]
+    propclass: Optional[str]
+    locationdescription: Optional[str]
+    bobsource_sourceid: Optional[int]
+    unfitdatestart: Optional[DateTime]
+    unfitdatestop: Optional[DateTime]
+    unfitby_userid: Optional[int]
+    abandoneddatestart: Optional[DateTime]
+    abandoneddatestop: Optional[DateTime]
+    abandonedby_userid: Optional[int]
+    vacantdatestart: Optional[DateTime]
+    vacantdatestop: Optional[DateTime]
+    vacantby_userid: Optional[int]
+    condition_intensityclassid: Optional[int]
+    landbankprospect_intensityclassid: Optional[int]
+    landbankheld: Optional[bool]
+    nonaddressable: Optional[int]
+    usetype_typeid: Optional[int]

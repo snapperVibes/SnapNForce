@@ -10,9 +10,11 @@ IMAGES = "Images"
 COMPS = "Comps"
 APPEAL = "Appeal"
 MAP = "Map"
+    
 
 
 # Todo: make threadsafe
+#  SNAPPERS: we're single threaded
 _client = {"async": None}
 
 

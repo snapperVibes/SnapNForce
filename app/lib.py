@@ -1,36 +1,87 @@
 # """ Common functions made from the primitives found in lib"""
 # fmt: off
+import logging
 import re
 from typing import Optional
 
 import sqlmodel
 from bs4 import NavigableString, Tag
-from sqlmodel import Session
+from sqlmodel import Session, text
 
-from app import schemas, orm
+from app import schemas, orm, constants
 from app.constants import LinkedObjectRole, _AddressAndHumanRoles
-from app.logging import logger
 from app.operations import select, deactivate, insert, select_or_insert
 from lib import scrape, parse
 
+log = logging.getLogger(__name__)
 
-async def sync_parcel_data(db: Session, parcel_id: str) -> schemas.GeneralAndMortgage:
+
+async def show_muni_list(db: Session) -> schemas.Munilist:
+    statement = sqlmodel.select(orm.Municipality)
+    res = db.exec(statement)
+    ml = []
+    for m in res:
+        ml.append(m)
+    return schemas.Munilist(
+        munis=ml
+    )
+
+
+async def write_bob_source(db: Session, title: str) -> orm.BObSource:
+    input_source = orm.BObSource(title=title, muni_municode=constants.COGLAND_MUNICODE, description=title, userattributable=True, active=True)
+    db.add(input_source)
+    db.commit()
+    db.refresh(input_source)
+    return input_source
+
+
+async def sync_parcel_data(db: Session, parcel_id: str, municode: int) -> schemas.GeneralAndMortgage:
+    """
+    Coordinator function of the grand and elaborate synchronization process for a single parcel
+    which involves these steps:
+    1) Scrape parcel owner, parcel address, owner mailing address, and tax mailing from county
+    2)
+    Parameters
+    ----------
+    db
+    :the database
+    parcel_id
+    :county identifier
+    municode
+    :host of the parcel
+
+    Returns
+    -------
+    TODO: change to sync log
+    """
+
     _county_data = await get_parcel_data_from_county(parcel_id)
 
     general_owner_and_mailing = None
     mortgage_owner_and_mailing = None
 
-    # todo: somehow get muni_municode filled in with _county_data, otherwise the insert doesn't work
-    model_parcel = orm.Parcel(parcelidcnty=parcel_id)
+    # fetch parcel from DB if it's in there
+    model_parcel = orm.Parcel(parcelidcnty=parcel_id, muni_municode=municode)
     parcel = select.parcel(db, model_parcel)
     parcel = parcel if parcel is not None else insert.parcel(db, model_parcel)
 
     data: schemas.OwnerAndMailing
     linked_object_roles: _AddressAndHumanRoles  # just a typehint because my editor couldn't figure out the correct type
     for data, linked_object_roles in zip(
-        (_county_data.general, _county_data.mortgage),
-        (LinkedObjectRole.general_roles, LinkedObjectRole.mortgage_roles)
+            (_county_data.general, _county_data.mortgage),
+            (LinkedObjectRole.general_roles, LinkedObjectRole.mortgage_roles)
     ):
+        if data.owner:
+            model_human = orm.Human(
+                name=data.owner.name,
+                multihuman=data.owner.is_multi_entity,
+                # businessentity=None,
+            )
+            # TODO: We need logging in both an event on the parcel and in a DB logfile that documents an insert vs. select
+            human = select_or_insert.human(db, model_human)
+        else:
+            human = None
+
         if data.mailing:
             model_city_state_zip = orm.MailingCityStateZip(
                 zip_code=data.mailing.last.zip,
@@ -58,19 +109,9 @@ async def sync_parcel_data(db: Session, parcel_id: str) -> schemas.GeneralAndMor
         else:
             city_state_zip = street = address = None
 
-        if data.owner:
-            model_human = orm.Human(
-                name=data.owner.name,
-                multihuman=data.owner.is_multi_entity,
-                # businessentity=None,
-            )
-            human = select_or_insert.human(db, model_human)
-        else:
-            human = None
-
-        # Todo: Let's write some wet code and fix it latter
-        # todo: remove unnecessary database calls
-
+        # TODO: Let's write some wet code and fix it latter
+        # TODO: remove unnecessary database calls: yes, let's
+        # now undertake the linking operations
         if address:
             _select_existing_addresses_linked_to_parcel = sqlmodel.select(
                 orm.ParcelMailingAddress
@@ -87,7 +128,6 @@ async def sync_parcel_data(db: Session, parcel_id: str) -> schemas.GeneralAndMor
                 parcel=parcel, mailingaddress=address, linkedobjectrole_lorid=linked_object_roles.address
             )
             linked_parcel_and_address = select_or_insert.linked_parcel_and_address(db, model_linked_parcel_and_address)
-
         if human:
             _select_existing_linked_humans_and_addresses = sqlmodel.select(orm.HumanMailingAddress).where(
                 orm.HumanMailingAddress.humanmailing_humanid == human.humanid,
@@ -101,8 +141,8 @@ async def sync_parcel_data(db: Session, parcel_id: str) -> schemas.GeneralAndMor
             model_linked_human_and_address = orm.HumanMailingAddress(
                 human=human, mailingaddress=address, linkedobjectrole_lorid=linked_object_roles.human
             )
-            linked_human_and_mailing_address = select_or_insert.linked_human_and_address(db, model_linked_human_and_address)
-
+            linked_human_and_mailing_address = select_or_insert.linked_human_and_address(db,
+                                                                                         model_linked_human_and_address)
         if human:
             _select_existing_linked_humans_and_parcels = sqlmodel.select(orm.HumanParcel).where(
                 orm.HumanParcel.parcel_parcelkey == parcel.parcelkey,
@@ -122,8 +162,6 @@ async def sync_parcel_data(db: Session, parcel_id: str) -> schemas.GeneralAndMor
                 human=human, parcel=parcel, linkedobjectrole_lorid=LinkedObjectRole.CURRENT_OWNER
             )
             linked_human_and_parcel = select_or_insert.linked_human_and_parcel(db, model_linked_human_and_parcel)
-
-
         # Ok, now time to re-serialize everything
         owner = schemas.Owner(
             name=human.name,
@@ -131,7 +169,7 @@ async def sync_parcel_data(db: Session, parcel_id: str) -> schemas.GeneralAndMor
         ) if not (human is None) else None
         mailing = schemas.Mailing(
             delivery=schemas.DeliveryAddressLine(
-                is_pobox=street.pobox if not street is None else None,
+                is_pobox=street.pobox if (not street is None) else None,  # if street is an object, we get the street
                 attn=address.attention if not address is None else None,
                 number=address.bldgno if not address is None else None,
                 street=street.name if not street is None else None,
@@ -158,17 +196,188 @@ async def sync_parcel_data(db: Session, parcel_id: str) -> schemas.GeneralAndMor
         general=general_owner_and_mailing,
         mortgage=mortgage_owner_and_mailing,
     )
-    logger.debug("Synced parcel", parcel_id=parcel_id, result=out)
+    log.debug("Synced parcel", parcel_id=parcel_id, result=out)
+
     return out
 
 
+async def generate_muni_parcel_status(municode: int, db: Session) -> schemas.MunicipalityParcelStats:
+    """
+    Counts how many parcels are in each muni by municode. Start by displaying all the munis
+    by their code
+
+    Parameters
+    ----------
+    municode
+    db
+
+    Returns
+    -------
+
+    """
+    statement = sqlmodel.select(orm.Parcel).where(orm.Parcel.muni_municode == municode)
+    res = db.exec(statement)
+    print("lib.generate_muni_parcel_status | printing parcels")
+    pcount = 0
+    for p in res:
+        pcount += 1
+    res = db.exec(text("SELECT count(parcelkey) FROM parcel"))
+    for row in res:
+        print(row.count)
+    return schemas.MunicipalityParcelStats(
+        municode=municode,
+        total=pcount,
+        unknown_parcels=0,
+        county_valid=0
+    )
 
 
+async def get_parcelids_by_muni(municode: int, db: Session) -> schemas.ParcelList:
+    """
+    Extract from the DB a list of all parcels by municode
+    Parameters
+    ----------
+    municode
+    for use in the where clause
+    Returns
+    -------
+    A conatiner for a list of Parcels
+    """
+    stmt = sqlmodel.select(orm.Parcel).where(orm.Parcel.muni_municode == municode)
+    res = db.exec(stmt)
+    return schemas.ParcelList(parcellist=[pcl for pcl in res])
 
 
+async def get_parcel_data_from_county(parcel_id: str) -> schemas.GeneralAndMortgage:
+    general_data = await get_general_data_from_county(parcel_id)
+    tax_data = await get_tax_data_from_county(parcel_id)
+    return schemas.GeneralAndMortgage(general=general_data, mortgage=tax_data)
 
 
+async def get_general_data_from_county(parcel_id: str):
+    response = await scrape.general_info(parcel_id)
+    response.raise_for_status()
+    _parceladdr, _owner, _mailing = parse.general_html_content(response.content)
+    parceladdr = mailing_from_raw_general(_parceladdr)
+    owner = owner_from_raw(_owner)
+    mailing = mailing_from_raw_general(_mailing)
+    return schemas.ParceladdrAndOwnerAndOwnerMailing(parceladdr=parceladdr, owner=owner, mailing=mailing)
 
+
+async def get_tax_data_from_county(parcel_id: str):
+    response = await scrape.tax_info(parcel_id)
+    response.raise_for_status()
+    _owner, _mailing = parse.mortgage_html_content(response.content)
+    owner = owner_from_raw(_owner)
+    mailing = mailing_from_raw_tax(_mailing)
+    return schemas.OwnerAndMailing(owner=owner, mailing=mailing)
+
+
+# noinspection PyInterpreter
+def owner_from_raw(data: list[Tag | NavigableString]) -> schemas.Owner:
+    owner_list = _clean_tags(data)
+    is_multi_entity = False
+    if len(owner_list) > 1:
+        is_multi_entity = True
+    # Owner names often have trailing whitespace
+    #  If it isn't stripped away, the dirty_owner != clean_owner check
+    #  will always return True.
+    dirty_owner = " & ".join(o.strip() for o in owner_list)
+    clean_owner = _clean_whitespace(dirty_owner)
+    if dirty_owner != clean_owner:  # Todo:
+        # Todo: this is most likely duplicate logic,
+        #  but I haven't taken time to prove it yet
+        is_multi_entity = True
+    return schemas.Owner(name=clean_owner, is_multi_entity=is_multi_entity)
+
+
+def mailing_from_raw_tax(data: list[Tag | NavigableString]) -> Optional[schemas.Mailing]:
+    # Todo: these two functions almost certainly belong in lib.parse
+    address_list = _clean_tags(data)
+    if len(address_list) == 3:
+        delivery_line = parse.mortgage_delivery_address_line(address_list[0])
+        last_line = parse.mortgage_last_line(city_state=address_list[1], zip=address_list[2])
+    elif not address_list:
+        return None
+    else:
+        raise NotImplementedError("lib.mailing_from_raw_tax : I haven't dealt with this yet")
+    return schemas.Mailing(delivery=delivery_line, last=last_line)
+
+
+def mailing_from_raw_general(data: list[Tag | NavigableString]) -> Optional[schemas.Mailing]:
+    address_list = _clean_tags(data)
+    if len(address_list) == 2:
+        delivery_line = parse.general_delivery_address_line(address_list[0])
+        last_line = parse.general_city_state_zip(address_list[1])
+    elif len(address_list) == 3:
+        delivery_line = parse.general_delivery_address_line(address_list[1])
+        # "ATTN ", "ATTN: ", "ATTENTION ", "ATTENTION: "
+        delivery_line.attn = re.sub(r"ATT(N|ENTION):?\s+", address_list[0], "")
+        last_line = parse.general_city_state_zip(address_list[2])
+    elif len(address_list) == 0:
+        return None
+    else:
+        raise RuntimeError
+    return schemas.Mailing(delivery=delivery_line, last=last_line)
+
+
+def _clean_tags(content: list[Tag | NavigableString]) -> list[str]:
+    return [str(tag) for tag in content if isinstance(tag, NavigableString)]
+
+
+def _clean_whitespace(text: str) -> str:
+    return re.sub(r"\s+", " ", text)
+
+
+# def get_cog_tables(db, parcel_id):
+#     all_addresses = []
+#     parcel = select.parcel(db, parcel_id)
+#     if parcel is None:
+#         raise RuntimeError
+#         # return schemas.CogGeneralAndMortgage(general=None, mortgage=None)
+#     parcel_addresses = select.parcel_mailing_addresses(db, parcel.parcelkey)
+#     for (parcel_address,) in parcel_addresses:
+#         address = select.address(db, parcel_address.mailingaddress_addressid)
+#         street = select.street(db, address.street_streetid)
+#         city_state_zip = select.city_state_zip(db, street.citystatezip_cszipid)
+#         try:
+#             human_address = select.human_mailing_address(db, address.addressid)
+#             human = select.human(db, human_address.humanmailing_humanid)
+#         except NoResultFound:
+#             human_address = human = None
+#         tables = schemas.CogTables(
+#             address=address,
+#             parcel_address=parcel_address,
+#             street=street,
+#             city_state_zip=city_state_zip,
+#             human=human,
+#             human_address=human_address,
+#         )
+#         all_addresses.append(tables)
+#     # todo: this only works because we are currently lax and accept optional tables
+#     #  it would be nice to roll this logic into the above code
+#     general = _match_general(all_addresses) or schemas.CogTables()
+#     mortgage = _match_mortgage(all_addresses) or schemas.CogTables()
+#     general.parcel = mortgage.parcel = parcel
+#     return schemas.CogGeneralAndMortgage(general=general, mortgage=mortgage)
+#
+#
+# def _match_number(num_to_match: int, owners_and_mailings: list[schemas.CogTables]):
+#     for x in owners_and_mailings:
+#         if x.parcel_address.linkedobjectrole_lorid == num_to_match:
+#             return x
+#     return None
+#
+#
+# _match_general = partial(_match_number, LinkedObjectRole.GENERAL_HUMAN_MAILING_ADDRESS)
+# _match_mortgage = partial(_match_number, LinkedObjectRole.MORTGAGE_HUMAN_MAILING_ADDRESS)
+
+
+# def select_all_parcels_in_municode(db: Session, *, municode: int):
+#     return select.parcels_by_municode(db, municode=municode)
+def select_all_parcels_in_municode(db, municode):
+    statement = sqlmodel.select(orm.Parcel).where(orm.Parcel.muni_municode == municode)
+    return db.exec(statement)
 
 
 
@@ -197,7 +406,6 @@ async def sync_parcel_data(db: Session, parcel_id: str) -> schemas.GeneralAndMor
 #         address_and_human_roles: tuple[int, int]
 # ) -> schemas.OwnerAndMailing:
 #     address_id = cog_tables and cog_tables.address and cog_tables.address.addressid
-
 
 
 # def _sync_owner_and_mailing(
@@ -321,137 +529,3 @@ async def sync_parcel_data(db: Session, parcel_id: str) -> schemas.GeneralAndMor
 #         owner=owner,
 #         mailing=mailing
 #     )
-
-
-
-
-
-
-async def get_parcel_data_from_county(parcel_id: str) -> schemas.GeneralAndMortgage:
-    general_data = await get_general_data_from_county(parcel_id)
-    tax_data = await get_tax_data_from_county(parcel_id)
-    return schemas.GeneralAndMortgage(general=general_data, mortgage=tax_data)
-
-
-async def get_general_data_from_county(parcel_id: str):
-    response = await scrape.general_info(parcel_id)
-    response.raise_for_status()
-    _owner, _mailing = parse.general_html_content(response.content)
-    owner = owner_from_raw(_owner)
-    mailing = mailing_from_raw_general(_mailing)
-    return schemas.OwnerAndMailing(owner=owner, mailing=mailing)
-
-
-async def get_tax_data_from_county(parcel_id: str):
-    response = await scrape.tax_info(parcel_id)
-    response.raise_for_status()
-    _owner, _mailing = parse.mortgage_html_content(response.content)
-    owner = owner_from_raw(_owner)
-    mailing = mailing_from_raw_tax(_mailing)
-    return schemas.OwnerAndMailing(owner=owner, mailing=mailing)
-
-
-def owner_from_raw(data: list[Tag | NavigableString]) -> schemas.Owner:
-    owner_list = _clean_tags(data)
-    is_multi_entity = False
-    if len(owner_list) > 1:
-        is_multi_entity = True
-    # Owner names often have trailing whitespace
-    #  If it isn't stripped away, the dirty_owner != clean_owner check
-    #  will always return True.
-    dirty_owner = " & ".join(o.strip() for o in owner_list)
-    clean_owner = _clean_whitespace(dirty_owner)
-    if dirty_owner != clean_owner:  # Todo:
-        # Todo: this is most likely duplicate logic,
-        #  but I haven't taken time to prove it yet
-        is_multi_entity = True
-    return schemas.Owner(name=clean_owner, is_multi_entity=is_multi_entity)
-
-
-def mailing_from_raw_tax(data: list[Tag | NavigableString]) -> Optional[schemas.Mailing]:
-    # Todo: these two functions almost certainly belong in lib.parse
-    address_list = _clean_tags(data)
-    if len(address_list) == 3:
-        delivery_line = parse.mortgage_delivery_address_line(address_list[0])
-        last_line = parse.mortgage_last_line(city_state=address_list[1], zip=address_list[2])
-    elif not address_list:
-        return None
-    else:
-        raise NotImplementedError("I haven't dealt with this yet")
-    return schemas.Mailing(delivery=delivery_line, last=last_line)
-
-
-def mailing_from_raw_general(data: list[Tag | NavigableString]) -> Optional[schemas.Mailing]:
-    address_list = _clean_tags(data)
-    if len(address_list) == 2:
-        delivery_line = parse.general_delivery_address_line(address_list[0])
-        last_line = parse.general_city_state_zip(address_list[1])
-    elif len(address_list) == 3:
-        delivery_line = parse.general_delivery_address_line(address_list[1])
-        # "ATTN ", "ATTN: ", "ATTENTION ", "ATTENTION: "
-        delivery_line.attn = re.sub(r"ATT(N|ENTION):?\s+", address_list[0], "")
-        last_line = parse.general_city_state_zip(address_list[2])
-    elif len(address_list) == 0:
-        return None
-    else:
-        raise RuntimeError
-    return schemas.Mailing(delivery=delivery_line, last=last_line)
-
-
-def _clean_tags(content: list[Tag | NavigableString]) -> list[str]:
-    return [str(tag) for tag in content if isinstance(tag, NavigableString)]
-
-
-def _clean_whitespace(text: str) -> str:
-    return re.sub(r"\s+", " ", text)
-
-
-# def get_cog_tables(db, parcel_id):
-#     all_addresses = []
-#     parcel = select.parcel(db, parcel_id)
-#     if parcel is None:
-#         raise RuntimeError
-#         # return schemas.CogGeneralAndMortgage(general=None, mortgage=None)
-#     parcel_addresses = select.parcel_mailing_addresses(db, parcel.parcelkey)
-#     for (parcel_address,) in parcel_addresses:
-#         address = select.address(db, parcel_address.mailingaddress_addressid)
-#         street = select.street(db, address.street_streetid)
-#         city_state_zip = select.city_state_zip(db, street.citystatezip_cszipid)
-#         try:
-#             human_address = select.human_mailing_address(db, address.addressid)
-#             human = select.human(db, human_address.humanmailing_humanid)
-#         except NoResultFound:
-#             human_address = human = None
-#         tables = schemas.CogTables(
-#             address=address,
-#             parcel_address=parcel_address,
-#             street=street,
-#             city_state_zip=city_state_zip,
-#             human=human,
-#             human_address=human_address,
-#         )
-#         all_addresses.append(tables)
-#     # todo: this only works because we are currently lax and accept optional tables
-#     #  it would be nice to roll this logic into the above code
-#     general = _match_general(all_addresses) or schemas.CogTables()
-#     mortgage = _match_mortgage(all_addresses) or schemas.CogTables()
-#     general.parcel = mortgage.parcel = parcel
-#     return schemas.CogGeneralAndMortgage(general=general, mortgage=mortgage)
-#
-#
-# def _match_number(num_to_match: int, owners_and_mailings: list[schemas.CogTables]):
-#     for x in owners_and_mailings:
-#         if x.parcel_address.linkedobjectrole_lorid == num_to_match:
-#             return x
-#     return None
-#
-#
-# _match_general = partial(_match_number, LinkedObjectRole.GENERAL_HUMAN_MAILING_ADDRESS)
-# _match_mortgage = partial(_match_number, LinkedObjectRole.MORTGAGE_HUMAN_MAILING_ADDRESS)
-
-
-# def select_all_parcels_in_municode(db: Session, *, municode: int):
-#     return select.parcels_by_municode(db, municode=municode)
-def select_all_parcels_in_municode(db, municode):
-    statement = sqlmodel.select(orm.Parcel).where(orm.Parcel.muni_municode==municode)
-    return db.exec(statement)

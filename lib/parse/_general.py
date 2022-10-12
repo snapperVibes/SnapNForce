@@ -1,7 +1,9 @@
 # fmt: off
 from lark import Transformer, LarkError
 from lib.parse._common import _make_parser, _extract_zip_code
+from lib.parse.exceptions import HtmlParsingError
 from lib.parse.models import DeliveryAddressLine, LastLine
+import re
 
 general_parser = _make_parser("general")
 
@@ -63,6 +65,7 @@ class GeneralTransformer(Transformer):
             secondary=self._secondary
         )
 
+
 def general_delivery_address_line(text: str) -> DeliveryAddressLine:
     try:
         tree = general_parser.parse(text)
@@ -72,6 +75,10 @@ def general_delivery_address_line(text: str) -> DeliveryAddressLine:
         print(str(err))
         raise
 
+
 def general_city_state_zip(text: str) -> LastLine:
-    city, _comma, state, zip_ = text.split("\xa0")
-    return LastLine(city=city, state=state, zip=_extract_zip_code(zip_))
+    # This function parses both the property address    (PITTSBURGH,\xa0PA\xa015235)
+    #  and the owner mailing                            (PITTSBURGH\xa0,\xa0PA\xa015235-5033)
+    city, state, zip_ = (x for x in text.split("\xa0") if x != ",")
+    return LastLine(city=city.rstrip(","), state=state, zip=_extract_zip_code(zip_))
+ 

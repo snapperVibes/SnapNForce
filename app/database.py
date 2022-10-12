@@ -20,11 +20,12 @@ except pgpasslib.PgPassException as err:
         f"Using development password instead.\n"
         f"Note: you can specify the password file using the PGPASS environment variable."
     )
-    _db_password = "changeme"
+    _db_password = "c0d3"
 
 _engine_params = f"postgresql+psycopg2://{_db_user}:{_db_password}@{_host}:{_port}/{_db_name}"
-_engine: Engine = create_engine(_engine_params, echo=False)
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=_engine)
+_engine: Engine = create_engine(_engine_params, echo=True)
+# to write to DB, turn this autocommit to True
+SessionLocal = sessionmaker(autocommit=True, autoflush=False, bind=_engine)
 
 
 def get_db():

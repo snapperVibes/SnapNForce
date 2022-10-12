@@ -2,8 +2,8 @@ start: secure_unit | regular
 
 regular: building_number? street type? secondary?
 building_number: (WORD _SEP*)+ _END
-street: (WORD _SEP*)+ _END
-type: TYPE_IDENTIFIER _END
+street: (WORD _SEP*)+ _END?
+type: TYPE_IDENTIFIER _END?
 secondary: ((secondary_that_requires_range _SEP* _END range) | (secondary_with_optional_range (_END range)?)) _END
 
 secure_unit: pobox_clause

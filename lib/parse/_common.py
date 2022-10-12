@@ -11,8 +11,8 @@ def _make_parser(name: str):
         grammar = f.read()
     return Lark(grammar, start="start", parser="earley")
 
-# Todo: decide whether to use Regex or string methods
+
 def _extract_zip_code(text: str) -> str:
+    """ Naively parses the 5-digit zip code from codes like 15235 and 15235-5033"""
     return text.split("-")[0]
 
-# _zip_code = re.compile(r"(\d{5})(-\d{4})?")

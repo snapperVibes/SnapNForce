@@ -6,6 +6,7 @@ from app import orm
 from lib.models import DeliveryAddressLine, LastLine
 
 
+
 class Owner(SQLModel):
     name: str
     is_multi_entity: Optional[bool]
@@ -21,8 +22,14 @@ class OwnerAndMailing(SQLModel):
     mailing: Optional[Mailing] = None
 
 
+class ParceladdrAndOwnerAndOwnerMailing(SQLModel):
+    parceladdr: Optional[Mailing] = None
+    owner: Optional[Owner] = None
+    mailing: Optional[Mailing] = None
+
+
 class GeneralAndMortgage(SQLModel):
-    general: OwnerAndMailing
+    general: ParceladdrAndOwnerAndOwnerMailing
     mortgage: OwnerAndMailing
 
 
@@ -64,3 +71,22 @@ class SyncedParcelSummery(SQLModel):
 class MunicipalitySyncData(SQLModel):
     total: int
     skipped: list[str]
+
+
+class Munilist(SQLModel):
+    munis: list[orm.Municipality]
+
+
+class ParcelList(SQLModel):
+    parcellist: list[orm.Parcel]
+
+
+class OperationLog(SQLModel):
+    log: str
+
+
+class MunicipalityParcelStats(SQLModel):
+    municode: int
+    total: int
+    county_valid: int
+    unknown_parcels: int
