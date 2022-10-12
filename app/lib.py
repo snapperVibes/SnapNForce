@@ -10,9 +10,10 @@ from sqlmodel import Session, text
 
 from app import schemas, orm, constants
 from app.constants import LinkedObjectRole, _AddressAndHumanRoles
-from app.logging import logger
 from app.operations import select, deactivate, insert, select_or_insert
 from lib import scrape, parse
+
+log = logging.getLogger(__name__)
 
 
 async def show_muni_list(db: Session) -> schemas.Munilist:
@@ -27,7 +28,6 @@ async def show_muni_list(db: Session) -> schemas.Munilist:
 
 
 async def write_bob_source(db: Session, title: str) -> orm.BObSource:
-    print('ECDLOG: write_bob_source', title)
     input_source = orm.BObSource(title=title, muni_municode=constants.COGLAND_MUNICODE, description=title, userattributable=True, active=True)
     db.add(input_source)
     db.commit()
@@ -54,10 +54,8 @@ async def sync_parcel_data(db: Session, parcel_id: str, municode: int) -> schema
     -------
     TODO: change to sync log
     """
-    print('^^^^^ ECDLOG: sync_parcel_data: ', parcel_id, ' MUNI: ', municode)
 
     _county_data = await get_parcel_data_from_county(parcel_id)
-    print('^^^^^ sync_parcel_data | _county_data: ', _county_data)
 
     general_owner_and_mailing = None
     mortgage_owner_and_mailing = None
@@ -73,8 +71,6 @@ async def sync_parcel_data(db: Session, parcel_id: str, municode: int) -> schema
             (_county_data.general, _county_data.mortgage),
             (LinkedObjectRole.general_roles, LinkedObjectRole.mortgage_roles)
     ):
-        print('^^^^^ sync_parcel_data | inside for over data, linked_object_roles | data: ', data)
-        print('^^^^^ sync_parcel_data | inside for over data, linked_object_roles | linked_object_roles: ', linked_object_roles)
         if data.owner:
             model_human = orm.Human(
                 name=data.owner.name,
@@ -83,9 +79,7 @@ async def sync_parcel_data(db: Session, parcel_id: str, municode: int) -> schema
             )
             # TODO: We need logging in both an event on the parcel and in a DB logfile that documents an insert vs. select
             human = select_or_insert.human(db, model_human)
-            print("^^^^^ ECD LOG: lib.sync:human= ", human)
         else:
-            print("^^^^^ ECD LOG: lib.sync: Hark! No owner found on county site!")
             human = None
 
         if data.mailing:
@@ -95,7 +89,6 @@ async def sync_parcel_data(db: Session, parcel_id: str, municode: int) -> schema
                 city=data.mailing.last.city
             )
             city_state_zip = select_or_insert.city_state_zip(db, model_city_state_zip)
-            print('^^^^^ ECD Log:lib.sync_parcel_data; city_state_zip: ', city_state_zip)
 
             model_street = orm.MailingStreet(
                 name=data.mailing.delivery.street,
@@ -104,7 +97,6 @@ async def sync_parcel_data(db: Session, parcel_id: str, municode: int) -> schema
                 citystatezip=city_state_zip
             )
             street = select_or_insert.street(db, model_street)
-            print('^^^^^ ECD LOG:lib.sync_parcel_data; street: ', street)
 
             model_address = orm.MailingAddress(
                 bldgno=data.mailing.delivery.number,
@@ -114,7 +106,6 @@ async def sync_parcel_data(db: Session, parcel_id: str, municode: int) -> schema
                 street=street
             )
             address = select_or_insert.address(db, model_address)
-            print('^^^^^ ECD LOG:lib.sync_parcel_data; address: ', address)
         else:
             city_state_zip = street = address = None
 
@@ -132,13 +123,11 @@ async def sync_parcel_data(db: Session, parcel_id: str, municode: int) -> schema
             )
             non_current_linked_parcels_and_addresses = db.exec(_select_existing_addresses_linked_to_parcel).all()
             for _model_linked_parcel_and_address in non_current_linked_parcels_and_addresses:
-                print('^^^^^ ECDLOG | sync | deactivating: ', _model_linked_parcel_and_address)
                 deactivate.linking_model(db, _model_linked_parcel_and_address)
             model_linked_parcel_and_address = orm.ParcelMailingAddress(
                 parcel=parcel, mailingaddress=address, linkedobjectrole_lorid=linked_object_roles.address
             )
             linked_parcel_and_address = select_or_insert.linked_parcel_and_address(db, model_linked_parcel_and_address)
-            print('^^^^^ ECDLOG | sync | linked_parcel_and_address: ', linked_parcel_and_address)
         if human:
             _select_existing_linked_humans_and_addresses = sqlmodel.select(orm.HumanMailingAddress).where(
                 orm.HumanMailingAddress.humanmailing_humanid == human.humanid,
@@ -154,7 +143,6 @@ async def sync_parcel_data(db: Session, parcel_id: str, municode: int) -> schema
             )
             linked_human_and_mailing_address = select_or_insert.linked_human_and_address(db,
                                                                                          model_linked_human_and_address)
-            print('^^^^^ ECDLOG | sync | linked_human_and_mailing_address: ', linked_human_and_mailing_address)
         if human:
             _select_existing_linked_humans_and_parcels = sqlmodel.select(orm.HumanParcel).where(
                 orm.HumanParcel.parcel_parcelkey == parcel.parcelkey,
@@ -174,7 +162,6 @@ async def sync_parcel_data(db: Session, parcel_id: str, municode: int) -> schema
                 human=human, parcel=parcel, linkedobjectrole_lorid=LinkedObjectRole.CURRENT_OWNER
             )
             linked_human_and_parcel = select_or_insert.linked_human_and_parcel(db, model_linked_human_and_parcel)
-            print('^^^^^ ECDLOG | sync | linked_human_and_parcel: ', linked_human_and_parcel)
         # Ok, now time to re-serialize everything
         owner = schemas.Owner(
             name=human.name,
@@ -209,7 +196,7 @@ async def sync_parcel_data(db: Session, parcel_id: str, municode: int) -> schema
         general=general_owner_and_mailing,
         mortgage=mortgage_owner_and_mailing,
     )
-    logger.debug("Synced parcel", parcel_id=parcel_id, result=out)
+    log.debug("Synced parcel", parcel_id=parcel_id, result=out)
 
     return out
 
