@@ -1,0 +1,49 @@
+name: CI
+on:
+    push:
+        branches: [ main ]
+    pull_request:
+        branches: [ main ]
+jobs:
+    build:
+        if: startsWith(github.ref, '[ci skip]') != true
+        runs-on: ubuntu-latest
+        steps:
+            -   uses: actions/checkout@v3
+
+            -   name: Set up Python
+                uses: actions/setup-python@v4
+                with:
+                    python-version: '3.x'
+                    cache: 'poetry'
+
+            # I'd like to remove poetry, but I don't want to disrupt Eric's workflow (haha)
+            -   name: Install dependencies
+                run: |
+                    python -m pip install --upgrade pip
+                    python -m pip install poetry pytest
+
+            -   name: Run tests
+                run: python -m poetry run pytest
+
+            # This would build and push the image to a repository, but that's a little hardcore for this project
+            #-   name: Log in to registry
+            #    if: github.ref == 'refs/heads/main'
+            #    run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u $ --password-stdin
+
+            #-   name: Capture version from pyproject.toml
+            #    if: github.ref == 'refs/heads/main'
+            #    run: |
+            #        VERSION=$(grep -m 1 "version = " pyproject.toml | cut -d '"' -f 2)
+            #        echo "VERSION=$VERSION" >> $GITHUB_ENV
+
+            #-   name: Push as release candidate
+            #    if: github.ref == 'refs/heads/main'
+            #    run: |
+            #        IMAGE=$(docker build . --quiet)
+            #        SHA=$(git rev-parse --short HEAD)
+            #        RC_TAG=${{ env.VERSION }}-RC-${SHA}
+            #        docker tag $IMAGE ghcr.io/${{ github.repository }}:$RC_TAG
+            #        docker tag $IMAGE ghcr.io/${{ github.repository }}:latest
+            #        docker push ghcr.io/${{ github.repository }}:$RC_TAG
+            #        docker push ghcr.io/${{ github.repository }}:latest
