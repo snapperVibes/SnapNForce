@@ -14,9 +14,9 @@ jobs:
 
             -   name: Set up Python
                 uses: actions/setup-python@v4
-                with:
-                    python-version: '3.x'
-                    cache: 'poetry'
+                #with:
+                #    python-version: '3.x'
+                #    cache: 'poetry'
 
             # I'd like to remove poetry, but I don't want to disrupt Eric's workflow (haha)
             -   name: Install dependencies
